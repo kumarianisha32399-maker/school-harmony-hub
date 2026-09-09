@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Loader2, Inbox } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -60,12 +60,13 @@ export function TextField({
   placeholder?: string;
   required?: boolean;
 }) {
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label} {required && <span className="text-destructive">*</span>}
       </Label>
-      <Input type={type} value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      <Input id={id} type={type} value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }

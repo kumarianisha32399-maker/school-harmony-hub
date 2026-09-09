@@ -1,0 +1,5 @@
+- [ ] Register the remaining ERP pages in navigation and module routing.
+- [ ] Fix Student Result attendance percentage field.
+- [ ] Replace the ID card placeholder QR with a real QR code.
+- [ ] Add Fee Settings, Certificate Settings, and Staff Attendance pages.
+- [ ] Verify the added pages and existing login/dashboard in the live app.

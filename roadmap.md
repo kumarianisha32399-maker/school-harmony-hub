@@ -1,0 +1,6 @@
+- [x] Register the remaining ERP pages in navigation and module routing.
+- [x] Fix Student Result attendance percentage field.
+- [x] Replace the ID card placeholder QR with a real QR code.
+- [x] Add Fee Settings, Certificate Settings, and Staff Attendance pages.
+- [x] Fix the Save icon and useEffect compile errors.
+- [x] Verify all 62 pages, login, saving, refresh persistence and mobile layout in the live app.

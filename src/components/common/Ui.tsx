@@ -82,10 +82,12 @@ export function SelectField({
   onChange: (v: string) => void;
   options: (string | { value: string; label: string })[];
 }) {
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
       <select
+        id={id}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"

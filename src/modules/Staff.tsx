@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+"use client";
+
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/common/DataTable";
@@ -14,6 +16,8 @@ const emptyTeacher = {
   empId: "", name: "", father: "", dob: "", mobile: "", email: "", address: "",
   qualification: "", subject: SUBJECTS[0]?.name || "", classTeacherOf: "", joiningDate: today(), salary: 30000,
 };
+
+import { ImageUpload } from "@/components/common/ImageUpload";
 
 function TeacherForm({ form, set }: { form: any; set: (k: string, v: any) => void }) {
   return (
@@ -35,6 +39,14 @@ function TeacherForm({ form, set }: { form: any; set: (k: string, v: any) => voi
       <TextField label="Class Teacher Of" value={form.classTeacherOf} onChange={(v) => set("classTeacherOf", v)} />
       <TextField label="Joining Date" type="date" value={form.joiningDate} onChange={(v) => set("joiningDate", v)} />
       <TextField label="Monthly Salary" type="number" value={form.salary} onChange={(v) => set("salary", Number(v))} />
+      <div className="sm:col-span-2">
+        <ImageUpload
+          label="Teacher Photo (Cloudinary)"
+          value={form.photo}
+          onChange={(url) => set("photo", url)}
+          folder="teachers"
+        />
+      </div>
     </>
   );
 }
@@ -351,80 +363,6 @@ export function TeacherAttendance() {
                   >
                     {s}
                   </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
-    </>
-  );
-}
-
-export function StaffAttendance() {
-  const { staff, staffAttendance, replace } = useApp();
-  const [date, setDate] = useState(today());
-  const [status, setStatus] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const saved = staffAttendance.filter((row: any) => row.date === date);
-    setStatus(Object.fromEntries(saved.map((row: any) => [row.staffId, row.status])));
-  }, [date, staffAttendance]);
-
-  const counts = useMemo(() => {
-    const present = staff.filter((person: any) => (status[person.id] || "Present") === "Present").length;
-    const absent = staff.filter((person: any) => (status[person.id] || "Present") === "Absent").length;
-    const leave = staff.filter((person: any) => (status[person.id] || "Present") === "Leave").length;
-    return { present, absent, leave };
-  }, [staff, status]);
-
-  const save = () => {
-    const otherDates = staffAttendance.filter((row: any) => row.date !== date);
-    const rows = staff.map((person: any) => ({
-      id: `staff-att-${date}-${person.id}`,
-      staffId: person.id,
-      date,
-      status: status[person.id] || "Present",
-    }));
-    replace("staffAttendance", [...rows, ...otherDates]);
-    toast.success(`Staff attendance saved for ${fmtDate(date)}`);
-  };
-
-  return (
-    <>
-      <PageHeader
-        title="Staff Attendance"
-        subtitle="Mark and save daily attendance for non-teaching staff."
-        actions={<Button onClick={save}><Save className="size-4" /> Save Attendance</Button>}
-      />
-      <Panel>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Date" type="date" value={date} onChange={setDate} />
-          <div className="flex items-end gap-2 text-sm">
-            <Badge tone="green">Present {counts.present}</Badge>
-            <Badge tone="red">Absent {counts.absent}</Badge>
-            <Badge tone="amber">Leave {counts.leave}</Badge>
-          </div>
-        </div>
-        <div className="mt-5 space-y-2">
-          {staff.map((person: any) => {
-            const value = status[person.id] || "Present";
-            return (
-              <div key={person.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{person.name}</p>
-                  <p className="text-xs text-muted-foreground">{person.empId} • {person.designation}</p>
-                </div>
-                {['Present', 'Absent', 'Leave'].map((option) => (
-                  <Button
-                    key={option}
-                    type="button"
-                    size="sm"
-                    variant={value === option ? "default" : "outline"}
-                    onClick={() => setStatus((current) => ({ ...current, [person.id]: option }))}
-                  >
-                    {option}
-                  </Button>
                 ))}
               </div>
             );

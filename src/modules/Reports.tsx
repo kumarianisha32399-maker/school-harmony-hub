@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { DataTable } from "@/components/common/DataTable";

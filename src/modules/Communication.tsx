@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Pencil, Plus, Printer, Send, Trash2 } from "lucide-react";
@@ -276,72 +278,6 @@ export function ParentMessages() {
         >
           <Textarea rows={14} value={message} readOnly className="font-mono text-[13px]" />
         </Panel>
-      </div>
-    </div>
-  );
-}
-
-export function Announcements() {
-  const { notices, update, settings } = useApp();
-  const [audience, setAudience] = useState("All");
-  const list = useMemo(
-    () =>
-      notices
-        .filter((n: any) => audience === "All" || n.audience === audience || n.audience === "All")
-        .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))),
-    [notices, audience],
-  );
-
-  return (
-    <div>
-      <PageHeader
-        title="Announcements"
-        subtitle="Everything currently published to the school noticeboard."
-        actions={<Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print Board</Button>}
-      />
-      <Panel title="Filter">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <SelectField label="Audience" value={audience} onChange={setAudience} options={AUDIENCES} />
-        </div>
-      </Panel>
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {list.length === 0 && (
-          <Panel><p className="text-sm text-muted-foreground">No announcements for this audience.</p></Panel>
-        )}
-        {list.map((n: any) => (
-          <article key={n.id} className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-base font-semibold">{n.title}</h3>
-              <Badge tone={n.status === "Published" ? "green" : "amber"}>{n.status}</Badge>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {fmtDate(n.date)} • For {n.audience} • {settings['name']}
-            </p>
-            <p className="mt-3 whitespace-pre-line text-sm leading-6">{n.description}</p>
-            <div className="mt-4 flex gap-2 print:hidden">
-              <Button
-                size="sm"
-                variant={n.status === "Published" ? "outline" : "default"}
-                onClick={() => {
-                  update("notices", n.id, { status: n.status === "Published" ? "Draft" : "Published" });
-                  toast.success(n.status === "Published" ? "Moved back to draft" : "Announcement published");
-                }}
-              >
-                {n.status === "Published" ? "Unpublish" : "Publish"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  navigator.clipboard?.writeText(`${n.title}\n\n${n.description}\n\n— ${settings['name']}`);
-                  toast.success("Announcement copied");
-                }}
-              >
-                <Copy className="size-4" /> Copy
-              </Button>
-            </div>
-          </article>
-        ))}
       </div>
     </div>
   );

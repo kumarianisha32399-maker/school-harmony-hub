@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Check } from "lucide-react";
@@ -48,11 +50,11 @@ export function NewAdmission() {
   const [form, setForm] = useState<any>({ ...BLANK, regNo: `REG${5100 + admissions.length}` });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
-  const save = (alsoEnroll: boolean) => {
+  const save = async (alsoEnroll: boolean) => {
     if (!form.name.trim()) return toast.error("Student name is required.");
-    const row = add("admissions", form, "adm");
+    const row = await add("admissions", form, "adm");
     if (alsoEnroll) {
-      add(
+      await add(
         "students",
         {
           admissionNo: `ADM${Date.now().toString().slice(-7)}`,
@@ -65,7 +67,9 @@ export function NewAdmission() {
         },
         "stu",
       );
-      update("admissions", row.id, { status: "Approved" });
+      if (row?.id || (row as any)?._id) {
+        update("admissions", row.id || (row as any)._id, { status: "Approved" });
+      }
       toast.success("Admission saved and student enrolled.");
     } else {
       toast.success("Admission application saved.");

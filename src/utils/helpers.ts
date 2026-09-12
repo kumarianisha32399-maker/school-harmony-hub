@@ -93,37 +93,3 @@ export function qrMatrix(text: string, size = 21) {
   setBlock(size - 7, 0);
   return cells;
 }
-
-/** Real scannable QR code as a PNG data URL (client only). */
-export async function qrDataUrl(text: string, size = 160) {
-  const QR = (await import("qrcode")).default;
-  return QR.toDataURL(text, { width: size, margin: 1, errorCorrectionLevel: "M" });
-}
-
-/** Render a DOM node to a real downloadable PDF file. */
-export async function downloadPdf(elementId: string, filename: string) {
-  const node = document.getElementById(elementId);
-  if (!node) return;
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
-    import("jspdf"),
-  ]);
-  const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-  const img = canvas.toDataURL("image/jpeg", 0.95);
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const w = pageW - 10;
-  const h = (canvas.height * w) / canvas.width;
-  let remaining = h;
-  let position = 5;
-  pdf.addImage(img, "JPEG", 5, position, w, h);
-  remaining -= pageH - 10;
-  while (remaining > 0) {
-    position = position - (pageH - 10);
-    pdf.addPage();
-    pdf.addImage(img, "JPEG", 5, position, w, h);
-    remaining -= pageH - 10;
-  }
-  pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
-}

@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Save, Trash2 } from "lucide-react";
@@ -427,114 +429,6 @@ export function ClassResult() {
           { key: "result", label: "Result", render: (r) => <Badge tone={r.result === "PASS" ? "green" : "red"}>{r.result}</Badge> },
         ]}
       />
-    </div>
-  );
-}
-
-export function StudentResult() {
-  const { exams, students, attendance, settings } = useApp();
-  const [studentId, setStudentId] = useState(students[0]?.id || "");
-  const { marks, subjects } = useApp();
-  const s = students.find((x: any) => x.id === studentId);
-  const att = attendanceSummary(attendance, studentId);
-
-  const rows = useMemo(() => {
-    return exams
-      .map((e: any) => {
-        const max = Number(e.maxMarks || 100);
-        const pass = Number(e.passMarks || 33);
-        const mine = subjects
-          .map((sub: any) => marks.find((m: any) => m.examId === e.id && m.studentId === studentId && m.subjectId === sub.id))
-          .filter(Boolean) as any[];
-        if (!mine.length) return null;
-        const obtained = mine.reduce((a, b) => a + Number(b.marks || 0), 0);
-        const totalMax = mine.length * max;
-        const pct = Math.round((obtained / totalMax) * 1000) / 10;
-        return {
-          id: e.id, exam: e.name, type: e.type, totalMax, obtained, pct,
-          grade: gradeFor(pct),
-          result: mine.some((m) => Number(m.marks) < pass) ? "FAIL" : "PASS",
-        };
-      })
-      .filter(Boolean) as any[];
-  }, [exams, subjects, marks, studentId]);
-
-  const overall = rows.length
-    ? Math.round((rows.reduce((a, b) => a + b.pct, 0) / rows.length) * 10) / 10
-    : 0;
-
-  return (
-    <div>
-      <PageHeader title="Student Result" subtitle="All examination results for one student, session-wide." />
-      <Panel>
-        <SelectField
-          label="Student"
-          value={studentId}
-          onChange={setStudentId}
-          options={students.map((x: any) => ({ value: x.id, label: `${x.name} — ${x.className}-${x.section}` }))}
-        />
-      </Panel>
-
-      {!s || !rows.length ? (
-        <div className="mt-6"><EmptyState message="No marks recorded for this student yet." /></div>
-      ) : (
-        <div className="mt-6">
-          <DocToolbar docId="doc-student-result" fileName={`result-${s.admissionNo}`} />
-          <A4Document id="doc-student-result" title="Consolidated Result">
-            <p className="mb-3 text-center text-[11px] font-semibold">Academic Session {settings['session']}</p>
-            <div className="text-[11px]">
-              {[
-                ["Student Name", s.name],
-                ["Father's Name", s.father],
-                ["Admission No", s.admissionNo],
-                ["Class / Section", `${s.className} - ${s.section}`],
-                ["Roll Number", s.rollNo],
-                    ["Attendance", `${att.present}/${att.total} (${att.pct}%)`],
-              ].map(([l, v]) => (
-                <div key={String(l)} className="flex border-b border-dotted border-slate-400 py-0.5">
-                  <span className="w-36 font-semibold">{l}</span>
-                  <span>{v as any}</span>
-                </div>
-              ))}
-            </div>
-            <table className="mt-4 w-full border-collapse text-[11px]">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="border border-slate-500 p-1 text-left">Examination</th>
-                  <th className="border border-slate-500 p-1">Type</th>
-                  <th className="border border-slate-500 p-1">Max</th>
-                  <th className="border border-slate-500 p-1">Obtained</th>
-                  <th className="border border-slate-500 p-1">%</th>
-                  <th className="border border-slate-500 p-1">Grade</th>
-                  <th className="border border-slate-500 p-1">Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className="border border-slate-500 p-1">{r.exam}</td>
-                    <td className="border border-slate-500 p-1 text-center">{r.type}</td>
-                    <td className="border border-slate-500 p-1 text-center">{r.totalMax}</td>
-                    <td className="border border-slate-500 p-1 text-center">{r.obtained}</td>
-                    <td className="border border-slate-500 p-1 text-center">{r.pct}</td>
-                    <td className="border border-slate-500 p-1 text-center">{r.grade}</td>
-                    <td className="border border-slate-500 p-1 text-center font-semibold">{r.result}</td>
-                  </tr>
-                ))}
-                <tr className="bg-slate-100 font-bold">
-                  <td className="border border-slate-500 p-1" colSpan={4}>Overall Percentage</td>
-                  <td className="border border-slate-500 p-1 text-center">{overall}</td>
-                  <td className="border border-slate-500 p-1 text-center">{gradeFor(overall)}</td>
-                  <td className="border border-slate-500 p-1 text-center">
-                    {rows.some((r) => r.result === "FAIL") ? "FAIL" : "PASS"}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <SignRow items={["Class Teacher", "School Stamp", "Principal"]} />
-          </A4Document>
-        </div>
-      )}
     </div>
   );
 }

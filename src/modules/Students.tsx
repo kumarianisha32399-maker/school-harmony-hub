@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+"use client";
+
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
@@ -9,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { A4Document, DocToolbar, Field } from "@/components/common/A4Document";
-import { fmtDate, initials, inr, invoiceTotal, qrDataUrl, today } from "@/utils/helpers";
+import { fmtDate, initials, inr, invoiceTotal, qrMatrix, today } from "@/utils/helpers";
 import { BLOOD, CATEGORY } from "@/data/seed";
 import { Badge, attendanceSummary, feeSummary, useGoto } from "@/modules/shared";
 
@@ -20,6 +22,8 @@ const BLANK = {
   category: "General", bloodGroup: "O+", photo: "", guardian: "", occupation: "",
   previousSchool: "", status: "Active",
 };
+
+import { ImageUpload } from "@/components/common/ImageUpload";
 
 function StudentFormFields({ form, set, classes, sections }: any) {
   return (
@@ -46,6 +50,14 @@ function StudentFormFields({ form, set, classes, sections }: any) {
       <TextField label="Guardian Occupation" value={form.occupation} onChange={(v) => set("occupation", v)} />
       <TextField label="Previous School" value={form.previousSchool} onChange={(v) => set("previousSchool", v)} />
       <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={["Active", "Inactive", "Transferred"]} />
+      <div className="sm:col-span-2 lg:col-span-3">
+        <ImageUpload
+          label="Student Photo (Cloudinary Upload)"
+          value={form.photo}
+          onChange={(url) => set("photo", url)}
+          folder="students"
+        />
+      </div>
     </>
   );
 }
@@ -171,14 +183,19 @@ export function AddStudent() {
   const goto = useGoto();
   const [form, setForm] = useState<any>({ ...BLANK, admissionNo: `ADM${2025100 + students.length + 1}` });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim()) {
       toast.error("Student name is required.");
       return;
     }
-    const created = add("students", form, "stu");
+    const created = await add("students", form, "stu");
     toast.success("Student admitted successfully.");
-    goto(`students/profile/${created.id}`);
+    const targetId = created?.id || (created as any)?._id;
+    if (targetId) {
+      goto(`students/profile/${targetId}`);
+    } else {
+      goto("students");
+    }
   };
   return (
     <div>
@@ -395,31 +412,12 @@ export function TransferStudent() {
 }
 
 function Qr({ text }: { text: string }) {
-  const [src, setSrc] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    setSrc("");
-    qrDataUrl(text, 160)
-      .then((url) => {
-        if (active) setSrc(url);
-      })
-      .catch(() => {
-        if (active) setSrc("");
-      });
-    return () => {
-      active = false;
-    };
-  }, [text]);
-
+  const size = 21;
+  const cells = qrMatrix(text, size);
   return (
-    src ? (
-      <img src={src} alt="Scannable student identity QR code" className="size-16 bg-white p-0.5" />
-    ) : (
-      <div className="flex size-16 items-center justify-center bg-white text-center text-[7px] text-slate-700">
-        Creating QR…
-      </div>
-    )
+    <div className="grid size-16 bg-white" style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}>
+      {cells.map((on, i) => <div key={i} style={{ background: on ? "#0f172a" : "#fff" }} />)}
+    </div>
   );
 }
 

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   createContext,
   useCallback,
@@ -7,24 +9,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { KEYS, storage, uid } from "@/services/storage";
-import {
-  buildAdmissions,
-  buildAttendance,
-  buildExams,
-  buildFees,
-  buildMarks,
-  buildNotices,
-  buildStaff,
-  buildStudents,
-  buildTeachers,
-  buildTimetable,
-  CLASSES,
-  DEFAULT_SETTINGS,
-  SECTIONS,
-  SUBJECTS,
-  USERS,
-} from "@/data/seed";
+import { api } from "@/services/api";
+import { CLASSES, DEFAULT_SETTINGS, SECTIONS, SUBJECTS } from "@/data/seed";
+import { toast } from "sonner";
 
 type AnyRow = Record<string, any>;
 
@@ -40,12 +27,12 @@ type Collections = {
   notices: AnyRow[];
   admissions: AnyRow[];
   timetable: AnyRow[];
+  certificates: AnyRow[];
   classes: string[];
   sections: string[];
   subjects: AnyRow[];
   users: AnyRow[];
   salaries: AnyRow[];
-  staffAttendance: AnyRow[];
 };
 
 type User = { id: string; name: string; username: string; role: string; email: string };
@@ -56,49 +43,46 @@ type Ctx = Collections & {
   ready: boolean;
   theme: "light" | "dark";
   toggleTheme: () => void;
-  login: (username: string, password: string, role: string, remember: boolean) => string | null;
-  logout: () => void;
-  saveSettings: (s: AnyRow) => void;
-  add: (key: keyof Collections, row: AnyRow, prefix?: string) => AnyRow;
-  update: (key: keyof Collections, id: string, patch: AnyRow) => void;
-  remove: (key: keyof Collections, id: string) => void;
+  login: (username: string, password: string, role: string, remember: boolean) => Promise<string | null>;
+  logout: () => Promise<void>;
+  saveSettings: (s: AnyRow) => Promise<void>;
+  add: (key: keyof Collections, row: AnyRow, prefix?: string) => Promise<AnyRow>;
+  update: (key: keyof Collections, id: string, patch: AnyRow) => Promise<void>;
+  remove: (key: keyof Collections, id: string) => Promise<void>;
   replace: (key: keyof Collections, rows: AnyRow[]) => void;
-  resetDemoData: () => void;
+  refreshData: () => Promise<void>;
 };
 
 const AppContext = createContext<Ctx | null>(null);
 
-function seedAll() {
-  const students = buildStudents();
-  const teachers = buildTeachers();
-  const staff = buildStaff();
-  const { invoices, payments } = buildFees(students);
-  storage.set(KEYS.students, students);
-  storage.set(KEYS.teachers, teachers);
-  storage.set(KEYS.staff, staff);
-  storage.set(KEYS.invoices, invoices);
-  storage.set(KEYS.payments, payments);
-  storage.set(KEYS.attendance, buildAttendance(students));
-  storage.set(KEYS.exams, buildExams());
-  storage.set(KEYS.marks, buildMarks(students));
-  storage.set(KEYS.notices, buildNotices());
-  storage.set(KEYS.admissions, buildAdmissions(students));
-  storage.set(KEYS.timetable, buildTimetable());
-  storage.set(KEYS.classes, CLASSES);
-  storage.set(KEYS.sections, SECTIONS);
-  storage.set(KEYS.subjects, SUBJECTS);
-  storage.set(KEYS.settings, DEFAULT_SETTINGS);
-  storage.set(KEYS.users, USERS);
-  storage.set(KEYS.salaries, []);
-  storage.set(KEYS.staffAttendance, []);
-  storage.set(KEYS.seeded, true);
-}
-
 const EMPTY: Collections = {
-  students: [], teachers: [], staff: [], invoices: [], payments: [], attendance: [],
-  exams: [], marks: [], notices: [], admissions: [], timetable: [], staffAttendance: [],
-  classes: CLASSES, sections: SECTIONS, subjects: SUBJECTS, users: USERS, salaries: [],
+  students: [],
+  teachers: [],
+  staff: [],
+  invoices: [],
+  payments: [],
+  attendance: [],
+  exams: [],
+  marks: [],
+  notices: [],
+  admissions: [],
+  timetable: [],
+  certificates: [],
+  classes: CLASSES,
+  sections: SECTIONS,
+  subjects: SUBJECTS,
+  users: [],
+  salaries: [],
 };
+
+function normalizeRows(rows: any[]): any[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => {
+    if (!r) return r;
+    const id = r.id || (r._id ? String(r._id) : undefined);
+    return { ...r, id };
+  });
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Collections>(EMPTY);
@@ -107,110 +91,328 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  const loadAll = useCallback(() => {
-    setData({
-      students: storage.get(KEYS.students, [] as AnyRow[]),
-      teachers: storage.get(KEYS.teachers, [] as AnyRow[]),
-      staff: storage.get(KEYS.staff, [] as AnyRow[]),
-      invoices: storage.get(KEYS.invoices, [] as AnyRow[]),
-      payments: storage.get(KEYS.payments, [] as AnyRow[]),
-      attendance: storage.get(KEYS.attendance, [] as AnyRow[]),
-      exams: storage.get(KEYS.exams, [] as AnyRow[]),
-      marks: storage.get(KEYS.marks, [] as AnyRow[]),
-      notices: storage.get(KEYS.notices, [] as AnyRow[]),
-      admissions: storage.get(KEYS.admissions, [] as AnyRow[]),
-      timetable: storage.get(KEYS.timetable, [] as AnyRow[]),
-      classes: storage.get(KEYS.classes, CLASSES),
-      sections: storage.get(KEYS.sections, SECTIONS),
-      subjects: storage.get(KEYS.subjects, SUBJECTS as AnyRow[]),
-      users: storage.get(KEYS.users, USERS as AnyRow[]),
-      salaries: storage.get(KEYS.salaries, [] as AnyRow[]),
-      staffAttendance: storage.get(KEYS.staffAttendance, [] as AnyRow[]),
-    });
-    setSettings(storage.get(KEYS.settings, DEFAULT_SETTINGS));
+  // Load all live collections from MongoDB
+  const loadAll = useCallback(async () => {
+    try {
+      const [
+        studentsRes,
+        teachersRes,
+        staffRes,
+        feesRes,
+        paymentsRes,
+        attendanceRes,
+        examsRes,
+        marksRes,
+        noticesRes,
+        admissionsRes,
+        classesRes,
+        subjectsRes,
+        timetableRes,
+        settingsRes,
+        usersRes,
+        payrollRes,
+      ] = await Promise.all([
+        api.students.getAll().catch(() => ({ success: false, data: [] })),
+        api.teachers.getAll().catch(() => ({ success: false, data: [] })),
+        api.staff.getAll().catch(() => ({ success: false, data: [] })),
+        api.fees.getAll().catch(() => ({ success: false, data: [] })),
+        api.payments.getAll().catch(() => ({ success: false, data: [] })),
+        api.attendance.getAll().catch(() => ({ success: false, data: [] })),
+        api.exams.getAll().catch(() => ({ success: false, data: [] })),
+        api.marks.getAll().catch(() => ({ success: false, data: [] })),
+        api.notices.getAll().catch(() => ({ success: false, data: [] })),
+        api.admissions.getAll().catch(() => ({ success: false, data: [] })),
+        api.academics.getClasses().catch(() => ({ success: false, data: [] })),
+        api.academics.getSubjects().catch(() => ({ success: false, data: [] })),
+        api.academics.getTimetable().catch(() => ({ success: false, data: [] })),
+        api.settings.get().catch(() => ({ success: false, data: null })),
+        api.users.getAll().catch(() => ({ success: false, data: [] })),
+        api.payroll.getAll().catch(() => ({ success: false, data: [] })),
+      ]);
+
+      const classList =
+        classesRes.success && classesRes.data && classesRes.data.length > 0
+          ? classesRes.data.map((c: any) => c.name)
+          : CLASSES;
+
+      const subjectList =
+        subjectsRes.success && subjectsRes.data && subjectsRes.data.length > 0
+          ? normalizeRows(subjectsRes.data)
+          : SUBJECTS;
+
+      setData({
+        students: normalizeRows(studentsRes.data || []),
+        teachers: normalizeRows(teachersRes.data || []),
+        staff: normalizeRows(staffRes.data || []),
+        invoices: normalizeRows(feesRes.data || []),
+        payments: normalizeRows(paymentsRes.data || []),
+        attendance: normalizeRows(attendanceRes.data || []),
+        exams: normalizeRows(examsRes.data || []),
+        marks: normalizeRows(marksRes.data || []),
+        notices: normalizeRows(noticesRes.data || []),
+        admissions: normalizeRows(admissionsRes.data || []),
+        timetable: normalizeRows(timetableRes.data || []),
+        certificates: [],
+        classes: classList,
+        sections: SECTIONS,
+        subjects: subjectList,
+        users: normalizeRows(usersRes.data || []),
+        salaries: normalizeRows(payrollRes.data || []),
+      });
+
+      if (settingsRes.success && settingsRes.data) {
+        setSettings(settingsRes.data);
+      }
+    } catch (err) {
+      console.error("Error loading MongoDB collections:", err);
+    }
   }, []);
 
+  // Initial load
   useEffect(() => {
-    if (!storage.get(KEYS.seeded, false)) seedAll();
-    loadAll();
-    setUser(storage.get<User | null>(KEYS.session, null));
-    const t = storage.get<"light" | "dark">(KEYS.theme, "light");
-    setTheme(t);
-    document.documentElement.classList.toggle("dark", t === "dark");
-    setReady(true);
+    async function init() {
+      // 1. Check current authenticated session
+      const authRes = await api.auth.me().catch(() => null);
+      if (authRes?.success && authRes.user) {
+        setUser(authRes.user);
+      }
+
+      // 2. Fetch live database data
+      await loadAll();
+
+      // 3. Theme initialization (local preference)
+      const storedTheme = (typeof window !== "undefined" && window.localStorage.getItem("sms:theme")) as
+        | "light"
+        | "dark"
+        | null;
+      const initialTheme = storedTheme || "light";
+      setTheme(initialTheme);
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.toggle("dark", initialTheme === "dark");
+      }
+
+      setReady(true);
+    }
+    init();
   }, [loadAll]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next = prev === "light" ? "dark" : "light";
-      storage.set(KEYS.theme, next);
-      document.documentElement.classList.toggle("dark", next === "dark");
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("sms:theme", next);
+      }
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.toggle("dark", next === "dark");
+      }
       return next;
     });
   }, []);
 
-  const login: Ctx["login"] = useCallback((username, password, role, remember) => {
-    const users = storage.get(KEYS.users, USERS as AnyRow[]);
-    const found = users.find(
-      (u) => (u.username === username.trim() || u.email === username.trim()) && u.password === password,
-    );
-    if (!found) return "Invalid username or password.";
-    if (found.role !== role) return `These credentials belong to the ${found.role} role.`;
-    const session = { id: found.id, name: found.name, username: found.username, role: found.role, email: found.email };
-    setUser(session);
-    storage.set(KEYS.session, session);
-    if (remember) storage.set("remember", username);
-    else storage.remove("remember");
-    return null;
+  const login: Ctx["login"] = useCallback(
+    async (username, password, role, remember) => {
+      try {
+        const res = await api.auth.login({ username, password, role });
+        if (!res.success || !res.user) {
+          return res.error || "Invalid username or password.";
+        }
+        setUser(res.user);
+        if (remember && typeof window !== "undefined") {
+          window.localStorage.setItem("remember", username);
+        }
+        // Refresh collections upon login
+        loadAll();
+        return null;
+      } catch (err: any) {
+        return err.message || "Failed to log in.";
+      }
+    },
+    [loadAll]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await api.auth.logout();
+    } finally {
+      setUser(null);
+    }
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    storage.remove(KEYS.session);
+  const saveSettings = useCallback(async (s: AnyRow) => {
+    try {
+      const res = await api.settings.update(s);
+      if (res.success && res.data) {
+        setSettings(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
   }, []);
 
-  const persist = useCallback((key: keyof Collections, rows: AnyRow[]) => {
-    storage.set(key as string, rows);
+  // Universal add to MongoDB
+  const add: Ctx["add"] = useCallback(
+    async (key, row, prefix = "row") => {
+      try {
+        let res: any;
+        switch (key) {
+          case "students":
+            res = await api.students.create(row);
+            break;
+          case "teachers":
+            res = await api.teachers.create(row);
+            break;
+          case "staff":
+            res = await api.staff.create(row);
+            break;
+          case "admissions":
+            res = await api.admissions.create(row);
+            break;
+          case "invoices":
+            res = await api.fees.create(row);
+            break;
+          case "payments":
+            res = await api.payments.create(row);
+            break;
+          case "exams":
+            res = await api.exams.create(row);
+            break;
+          case "notices":
+            res = await api.notices.create(row);
+            break;
+          case "certificates":
+            res = await api.certificates.create(row);
+            break;
+          case "salaries":
+            res = await api.payroll.save(row);
+            break;
+          case "users":
+            res = await api.users.create(row);
+            break;
+          case "attendance":
+            res = await api.attendance.mark([row]);
+            break;
+          case "marks":
+            res = await api.marks.save([row]);
+            break;
+          case "timetable":
+            res = await api.academics.saveTimetable([row]);
+            break;
+          default:
+            res = { success: true, data: row };
+        }
+
+        const createdItem = res?.data ? { ...res.data, id: res.data.id || String(res.data._id) } : row;
+
+        setData((prev) => ({
+          ...prev,
+          [key]: [createdItem, ...(prev[key] || [])],
+        }));
+
+        return createdItem;
+      } catch (err: any) {
+        toast.error(`Error saving ${String(key)}: ${err.message}`);
+        return row;
+      }
+    },
+    []
+  );
+
+  // Universal update to MongoDB
+  const update: Ctx["update"] = useCallback(
+    async (key, id, patch) => {
+      try {
+        // Optimistic update
+        setData((prev) => ({
+          ...prev,
+          [key]: (prev[key] || []).map((r: any) =>
+            typeof r === "object" && r !== null && (r.id === id || r._id === id)
+              ? { ...r, ...patch }
+              : r
+          ),
+        }));
+
+        switch (key) {
+          case "students":
+            await api.students.update(id, patch);
+            break;
+          case "teachers":
+            await api.teachers.update(id, patch);
+            break;
+          case "staff":
+            await api.staff.update(id, patch);
+            break;
+          case "admissions":
+            await api.admissions.update(id, patch);
+            break;
+          case "invoices":
+            await api.fees.update(id, patch);
+            break;
+          case "exams":
+            await api.exams.update(id, patch);
+            break;
+          case "users":
+            await api.users.update(id, patch);
+            break;
+          case "salaries":
+            await api.payroll.save(patch);
+            break;
+          default:
+            break;
+        }
+      } catch (err: any) {
+        toast.error(`Error updating record: ${err.message}`);
+      }
+    },
+    []
+  );
+
+  // Universal delete from MongoDB
+  const remove: Ctx["remove"] = useCallback(
+    async (key, id) => {
+      try {
+        // Optimistic removal
+        setData((prev) => ({
+          ...prev,
+          [key]: (prev[key] || []).filter((r: any) =>
+            typeof r === "object" && r !== null ? r.id !== id && r._id !== id : true
+          ),
+        }));
+
+        switch (key) {
+          case "students":
+            await api.students.delete(id);
+            break;
+          case "teachers":
+            await api.teachers.delete(id);
+            break;
+          case "staff":
+            await api.staff.delete(id);
+            break;
+          case "admissions":
+            await api.admissions.delete(id);
+            break;
+          case "invoices":
+            await api.fees.delete(id);
+            break;
+          case "exams":
+            await api.exams.delete(id);
+            break;
+          case "users":
+            await api.users.delete(id);
+            break;
+          default:
+            break;
+        }
+      } catch (err: any) {
+        toast.error(`Error deleting record: ${err.message}`);
+      }
+    },
+    []
+  );
+
+  const replace: Ctx["replace"] = useCallback((key, rows) => {
     setData((d) => ({ ...d, [key]: rows }) as Collections);
   }, []);
-
-  const add: Ctx["add"] = useCallback(
-    (key, row, prefix = "row") => {
-      const rows = storage.get(key as string, [] as AnyRow[]);
-      const item = { id: row.id || uid(prefix), ...row };
-      persist(key, [item, ...rows]);
-      return item;
-    },
-    [persist],
-  );
-
-  const update: Ctx["update"] = useCallback(
-    (key, id, patch) => {
-      const rows = storage.get(key as string, [] as AnyRow[]);
-      persist(key, rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-    },
-    [persist],
-  );
-
-  const remove: Ctx["remove"] = useCallback(
-    (key, id) => {
-      const rows = storage.get(key as string, [] as AnyRow[]);
-      persist(key, rows.filter((r) => r.id !== id));
-    },
-    [persist],
-  );
-
-  const replace: Ctx["replace"] = useCallback((key, rows) => persist(key, rows), [persist]);
-
-  const saveSettings = useCallback((s: AnyRow) => {
-    storage.set(KEYS.settings, s);
-    setSettings(s);
-  }, []);
-
-  const resetDemoData = useCallback(() => {
-    seedAll();
-    loadAll();
-  }, [loadAll]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -227,9 +429,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       update,
       remove,
       replace,
-      resetDemoData,
+      refreshData: loadAll,
     }),
-    [data, settings, user, ready, theme, toggleTheme, login, logout, saveSettings, add, update, remove, replace, resetDemoData],
+    [data, settings, user, ready, theme, toggleTheme, login, logout, saveSettings, add, update, remove, replace, loadAll]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

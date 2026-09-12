@@ -66,7 +66,6 @@ export const NAV: NavGroup[] = [
       { label: "Marks List", slug: "exams/marks-list" },
       { label: "Report Card", slug: "exams/report-card" },
       { label: "Class Result", slug: "exams/class-result" },
-      { label: "Student Result", slug: "exams/student-result" },
     ],
   },
   {
@@ -78,8 +77,6 @@ export const NAV: NavGroup[] = [
       { label: "School Leaving", slug: "certificates/leaving" },
       { label: "Study Certificate", slug: "certificates/study" },
       { label: "Fee Certificate", slug: "certificates/fee" },
-      { label: "Admission Letter", slug: "certificates/admission-letter" },
-      { label: "Experience Certificate", slug: "certificates/experience" },
       { label: "Custom Certificate", slug: "certificates/custom" },
     ],
   },
@@ -90,7 +87,6 @@ export const NAV: NavGroup[] = [
       { label: "Teacher List", slug: "teachers" },
       { label: "Staff List", slug: "staff" },
       { label: "Teacher Attendance", slug: "teachers/attendance" },
-      { label: "Staff Attendance", slug: "staff/attendance" },
       { label: "Salary / Payroll", slug: "payroll" },
     ],
   },
@@ -118,7 +114,6 @@ export const NAV: NavGroup[] = [
     label: "Communication", icon: Megaphone, roles: ["Admin", "Staff", "Teacher"],
     items: [
       { label: "Notices", slug: "notices" },
-      { label: "Announcements", slug: "notices/announcements" },
       { label: "Parent Messages", slug: "notices/messages" },
     ],
   },
@@ -126,8 +121,6 @@ export const NAV: NavGroup[] = [
     label: "Settings", icon: Settings, roles: ["Admin"],
     items: [
       { label: "School Profile", slug: "settings" },
-      { label: "Fee Settings", slug: "settings/fees" },
-      { label: "Certificate Settings", slug: "settings/certificates" },
       { label: "User Management", slug: "settings/users" },
       { label: "Backup / Restore", slug: "settings/backup" },
     ],

@@ -1,5 +1,8 @@
+"use client";
+
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   GraduationCap,
@@ -22,7 +25,7 @@ import { resolveModule } from "@/modules/registry";
 
 export function AppShell({ slug }: { slug: string }) {
   const { user, ready, logout, theme, toggleTheme, settings, students } = useApp();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [open, setOpen] = useState<string[]>([]);
@@ -31,8 +34,8 @@ export function AppShell({ slug }: { slug: string }) {
   const groups = useMemo(() => navForRole(user?.role || "Admin"), [user]);
 
   useEffect(() => {
-    if (ready && !user) navigate({ to: "/" });
-  }, [ready, user, navigate]);
+    if (ready && !user) router.push("/");
+  }, [ready, user, router]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -57,7 +60,10 @@ export function AppShell({ slug }: { slug: string }) {
 
   const mod = resolveModule(slug, user.role);
 
-  const goto = (s: string) => navigate({ to: "/app/$", params: { _splat: s } });
+  const goto = (s: string) => {
+    const clean = s.replace(/^\/+/, "");
+    router.push(`/app/${clean}`);
+  };
 
   const sidebar = (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -229,7 +235,7 @@ export function AppShell({ slug }: { slug: string }) {
               size="icon"
               onClick={() => {
                 logout();
-                navigate({ to: "/" });
+                router.push("/");
               }}
               aria-label="Sign out"
             >
@@ -243,11 +249,10 @@ export function AppShell({ slug }: { slug: string }) {
             <div className="flex flex-col items-center gap-3 py-24 text-center">
               <h2 className="text-xl font-semibold">Page not available</h2>
               <p className="text-sm text-muted-foreground">
-                This module doesn't exist or your role has no access to it.
+                This module doesn&apos;t exist or your role has no access to it.
               </p>
               <Link
-                to="/app/$"
-                params={{ _splat: "dashboard" }}
+                href="/app/dashboard"
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Back to dashboard

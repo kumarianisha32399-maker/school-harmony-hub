@@ -1,7 +1,6 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { canAccess } from "@/config/navigation";
-import { EmptyState } from "@/components/common/Ui";
-import { PageHeader } from "@/components/common/Ui";
 import { Dashboard } from "@/modules/Dashboard";
 import {
   AddStudent,
@@ -21,7 +20,6 @@ import {
   DailyAttendance,
   MarkAttendance,
   MonthlyAttendance,
-  StudentAttendanceReport,
 } from "@/modules/Attendance";
 import {
   CollectFee,
@@ -40,15 +38,12 @@ import {
   ExamSchedule,
   MarksList,
   ReportCard,
-  StudentResult,
 } from "@/modules/Exams";
 import {
   BonafideCertificate,
   CharacterCertificate,
   CustomCertificate,
-  AdmissionLetter,
   FeeCertificate,
-  ExperienceCertificate,
   LeavingCertificate,
   StudyCertificate,
   TransferCertificate,
@@ -60,7 +55,12 @@ import {
   TeacherAttendance,
   TeacherList,
 } from "@/modules/Staff";
-import { AssignTeacher, ClassesSections, Subjects, Timetable } from "@/modules/Academics";
+import {
+  AssignTeacher,
+  ClassesSections,
+  Subjects,
+  Timetable,
+} from "@/modules/Academics";
 import {
   AdmissionReport,
   AttendanceReport,
@@ -69,124 +69,160 @@ import {
   StudentReport,
   TeacherReport,
 } from "@/modules/Reports";
-import { Announcements, Notices, ParentMessages } from "@/modules/Communication";
-import { BackupRestore, CertificateSettings, FeeSettings, SchoolProfile, UserManagement } from "@/modules/Settings";
-import { StaffAttendance } from "@/modules/Staff";
+import { Notices, ParentMessages } from "@/modules/Communication";
+import { BackupRestore, SchoolProfile, UserManagement } from "@/modules/Settings";
+import { canAccess } from "@/config/navigation";
 
-/**
- * Single source of truth mapping a sidebar slug to the screen it renders.
- * Adding a page = add an entry here plus an item in src/config/navigation.ts.
- */
-const ROUTES: Record<string, () => ReactNode> = {
-  dashboard: () => <Dashboard />,
+export function resolveModule(slug: string, role = "Admin"): ReactNode | null {
+  // Normalize slug
+  const cleanSlug = slug.replace(/^\/+|\/+$/g, "");
 
-  students: () => <StudentList />,
-  "students/add": () => <AddStudent />,
-  "students/promote": () => <PromoteStudent />,
-  "students/transfer": () => <TransferStudent />,
-  "students/id-card": () => <IdCard />,
-
-  admissions: () => <AdmissionList />,
-  "admissions/new": () => <NewAdmission />,
-  "admissions/form": () => <RegistrationForm />,
-  "admissions/receipt": () => <AdmissionReceipt />,
-
-  "attendance/mark": () => <MarkAttendance />,
-  "attendance/daily": () => <DailyAttendance />,
-  "attendance/monthly": () => <MonthlyAttendance />,
-  "attendance/student": () => <StudentAttendanceReport />,
-
-  "fees/structure": () => <FeeStructure />,
-  "fees/generate": () => <GenerateFee />,
-  "fees/collect": () => <CollectFee />,
-  "fees/receipt": () => <FeeReceipt />,
-  "fees/pending": () => <PendingFees />,
-  "fees/defaulters": () => <FeeDefaulters />,
-  "fees/payments": () => <PaymentHistory />,
-  "fees/collection": () => <MonthlyCollection />,
-
-  exams: () => <ExamSchedule />,
-  "exams/create": () => <CreateExam />,
-  "exams/marks": () => <EnterMarks />,
-  "exams/marks-list": () => <MarksList />,
-  "exams/report-card": () => <ReportCard />,
-  "exams/class-result": () => <ClassResult />,
-  "exams/student-result": () => <StudentResult />,
-
-  "certificates/bonafide": () => <BonafideCertificate />,
-  "certificates/transfer": () => <TransferCertificate />,
-  "certificates/character": () => <CharacterCertificate />,
-  "certificates/leaving": () => <LeavingCertificate />,
-  "certificates/study": () => <StudyCertificate />,
-  "certificates/fee": () => <FeeCertificate />,
-  "certificates/admission-letter": () => <AdmissionLetter />,
-  "certificates/experience": () => <ExperienceCertificate />,
-  "certificates/custom": () => <CustomCertificate />,
-
-  teachers: () => <TeacherList />,
-  "teachers/add": () => <AddTeacher />,
-  "teachers/attendance": () => <TeacherAttendance />,
-  staff: () => <StaffList />,
-  "staff/attendance": () => <StaffAttendance />,
-  payroll: () => <Payroll />,
-
-  "academics/classes": () => <ClassesSections />,
-  "academics/subjects": () => <Subjects />,
-  "academics/assign": () => <AssignTeacher />,
-  "academics/timetable": () => <Timetable />,
-
-  "reports/students": () => <StudentReport />,
-  "reports/attendance": () => <AttendanceReport />,
-  "reports/fees": () => <FeeReport />,
-  "reports/results": () => <ResultReport />,
-  "reports/admissions": () => <AdmissionReport />,
-  "reports/teachers": () => <TeacherReport />,
-
-  notices: () => <Notices />,
-  "notices/announcements": () => <Announcements />,
-  "notices/messages": () => <ParentMessages />,
-
-  settings: () => <SchoolProfile />,
-  "settings/fees": () => <FeeSettings />,
-  "settings/certificates": () => <CertificateSettings />,
-  "settings/users": () => <UserManagement />,
-  "settings/backup": () => <BackupRestore />,
-};
-
-function Notice({ title, message }: { title: string; message: string }) {
-  return (
-    <div>
-      <PageHeader title={title} />
-      <EmptyState message={message} />
-    </div>
-  );
-}
-
-export function resolveModule(slug: string, role: string): ReactNode {
-  const clean = slug.replace(/^\/+|\/+$/g, "") || "dashboard";
-
-  if (clean.startsWith("students/profile/")) {
-    if (!canAccess(role, clean))
-      return <Notice title="Not available" message={`The ${role} role cannot open student profiles.`} />;
-    return <StudentProfile id={clean.split("/")[2]} />;
+  // Check access permission
+  if (!canAccess(role, cleanSlug)) {
+    return null;
   }
 
-  const factory = ROUTES[clean];
-  if (!factory)
-    return (
-      <Notice
-        title="Page not found"
-        message="This screen doesn't exist. Pick a section from the sidebar to continue."
-      />
-    );
+  // Handle dynamic student profile route
+  if (cleanSlug.startsWith("students/profile/")) {
+    const id = cleanSlug.replace("students/profile/", "");
+    return <StudentProfile id={id} />;
+  }
 
-  if (!canAccess(role, clean))
-    return (
-      <Notice
-        title="Access restricted"
-        message={`The ${role} role doesn't have permission to open this section.`}
-      />
-    );
+  switch (cleanSlug) {
+    case "dashboard":
+      return <Dashboard />;
 
-  return factory();
+    // Students
+    case "students":
+      return <StudentList />;
+    case "students/add":
+      return <AddStudent />;
+    case "students/promote":
+      return <PromoteStudent />;
+    case "students/transfer":
+      return <TransferStudent />;
+    case "students/id-card":
+      return <IdCard />;
+
+    // Admissions
+    case "admissions":
+      return <AdmissionList />;
+    case "admissions/new":
+      return <NewAdmission />;
+    case "admissions/form":
+      return <RegistrationForm />;
+    case "admissions/receipt":
+      return <AdmissionReceipt />;
+
+    // Attendance
+    case "attendance/mark":
+      return <MarkAttendance />;
+    case "attendance/daily":
+      return <DailyAttendance />;
+    case "attendance/monthly":
+      return <MonthlyAttendance />;
+    case "attendance/student":
+      return <AttendanceReport />;
+
+    // Fees
+    case "fees/structure":
+      return <FeeStructure />;
+    case "fees/generate":
+      return <GenerateFee />;
+    case "fees/collect":
+      return <CollectFee />;
+    case "fees/receipt":
+      return <FeeReceipt />;
+    case "fees/pending":
+      return <PendingFees />;
+    case "fees/defaulters":
+      return <FeeDefaulters />;
+    case "fees/payments":
+      return <PaymentHistory />;
+    case "fees/collection":
+      return <MonthlyCollection />;
+
+    // Exams
+    case "exams":
+      return <ExamSchedule />;
+    case "exams/create":
+      return <CreateExam />;
+    case "exams/marks":
+      return <EnterMarks />;
+    case "exams/marks-list":
+      return <MarksList />;
+    case "exams/report-card":
+      return <ReportCard />;
+    case "exams/class-result":
+      return <ClassResult />;
+
+    // Certificates
+    case "certificates/bonafide":
+      return <BonafideCertificate />;
+    case "certificates/transfer":
+      return <TransferCertificate />;
+    case "certificates/character":
+      return <CharacterCertificate />;
+    case "certificates/leaving":
+      return <LeavingCertificate />;
+    case "certificates/study":
+      return <StudyCertificate />;
+    case "certificates/fee":
+      return <FeeCertificate />;
+    case "certificates/custom":
+      return <CustomCertificate />;
+
+    // Teachers & Staff
+    case "teachers":
+      return <TeacherList />;
+    case "teachers/add":
+      return <AddTeacher />;
+    case "staff":
+      return <StaffList />;
+    case "teachers/attendance":
+      return <TeacherAttendance />;
+    case "payroll":
+      return <Payroll />;
+
+    // Academics
+    case "academics/classes":
+      return <ClassesSections />;
+    case "academics/subjects":
+      return <Subjects />;
+    case "academics/assign":
+      return <AssignTeacher />;
+    case "academics/timetable":
+      return <Timetable />;
+
+    // Reports
+    case "reports/students":
+      return <StudentReport />;
+    case "reports/attendance":
+      return <AttendanceReport />;
+    case "reports/fees":
+      return <FeeReport />;
+    case "reports/results":
+      return <ResultReport />;
+    case "reports/admissions":
+      return <AdmissionReport />;
+    case "reports/teachers":
+      return <TeacherReport />;
+
+    // Communication
+    case "notices":
+      return <Notices />;
+    case "notices/messages":
+      return <ParentMessages />;
+
+    // Settings
+    case "settings":
+      return <SchoolProfile />;
+    case "settings/users":
+      return <UserManagement />;
+    case "settings/backup":
+      return <BackupRestore />;
+
+    default:
+      return null;
+  }
 }

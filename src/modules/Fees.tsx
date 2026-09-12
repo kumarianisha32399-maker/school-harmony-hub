@@ -1,7 +1,10 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/services/api";
 import { DataTable } from "@/components/common/DataTable";
 import { EmptyState, PageHeader, Panel, SelectField, TextField, useConfirm } from "@/components/common/Ui";
 import { Button } from "@/components/ui/button";
@@ -116,31 +119,123 @@ export function GenerateFee() {
 }
 
 export function CollectFee() {
-  const { students, invoices, update, add, user } = useApp();
+  const { students, invoices, update, add, user, refreshData, settings } = useApp();
   const goto = useGoto();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState(0);
   const [mode, setMode] = useState(PAYMENT_MODES[0]);
   const [date, setDate] = useState(today());
+  const [loading, setLoading] = useState(false);
 
   const open = invoices.filter((i: any) => i.studentId === studentId && invoiceTotal(i) - i.paid > 0);
   const inv = open.find((i: any) => i.id === invoiceId) || open[0];
   const balance = inv ? invoiceTotal(inv) - inv.paid : 0;
 
-  const collect = () => {
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined") return resolve(false);
+      if ((window as any).Razorpay) return resolve(true);
+
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const collect = async () => {
     if (!inv) {
       toast.error("No pending invoice for this student.");
       return;
     }
     const pay = Number(amount) || balance;
+
+    if (mode === "Razorpay Online") {
+      setLoading(true);
+      try {
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded) {
+          toast.error("Failed to load Razorpay SDK. Please check your internet connection.");
+          setLoading(false);
+          return;
+        }
+
+        const orderRes = await api.razorpay.createOrder({
+          studentId,
+          invoiceId: inv.id,
+          amount: pay,
+        });
+
+        if (!orderRes.success || !orderRes.orderId) {
+          toast.error(orderRes.error || "Failed to create Razorpay order.");
+          setLoading(false);
+          return;
+        }
+
+        const options = {
+          key: orderRes.keyId,
+          amount: orderRes.amount,
+          currency: orderRes.currency,
+          name: settings?.name || "Harmony Public School",
+          description: `Fee Payment for ${inv.month}`,
+          order_id: orderRes.orderId,
+          prefill: {
+            name: orderRes.student?.name || "",
+            email: orderRes.student?.email || "",
+            contact: orderRes.student?.mobile || "",
+          },
+          theme: {
+            color: "#4f46e5",
+          },
+          handler: async (response: any) => {
+            try {
+              const verifyRes = await api.razorpay.verifyPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                studentId,
+                invoiceId: inv.id,
+                amount: pay,
+              });
+
+              if (verifyRes.success) {
+                toast.success(`Online payment of ${inr(pay)} verified and recorded successfully!`);
+                await refreshData();
+                goto("fees/receipt");
+              } else {
+                toast.error(verifyRes.error || "Payment signature verification failed.");
+              }
+            } catch {
+              toast.error("Payment verification request failed.");
+            }
+          },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } catch (err: any) {
+        toast.error(`Razorpay checkout error: ${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Manual payment modes (Cash, UPI, Card, Bank Transfer, Cheque)
     const newPaid = Math.min(invoiceTotal(inv), inv.paid + pay);
-    update("invoices", inv.id, { paid: newPaid, status: newPaid >= invoiceTotal(inv) ? "Paid" : "Pending" });
-    add("payments", {
+    await update("invoices", inv.id, { paid: newPaid, status: newPaid >= invoiceTotal(inv) ? "Paid" : "Pending" });
+    await add("payments", {
       receiptNo: `RCP${Date.now().toString().slice(-6)}`,
-      invoiceId: inv.id, studentId, date, amount: pay, mode,
+      invoiceId: inv.id,
+      studentId,
+      date,
+      amount: pay,
+      mode,
       receivedBy: user?.name || "Office",
     }, "pay");
+
     toast.success(`Payment of ${inr(pay)} recorded.`);
     goto("fees/receipt");
   };
@@ -159,7 +254,9 @@ export function CollectFee() {
             <SelectField label="Payment Mode" value={mode} onChange={setMode} options={PAYMENT_MODES} />
             <TextField label="Payment Date" type="date" value={date} onChange={setDate} />
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={collect}>Save Payment</Button>
+              <Button className="flex-1" onClick={collect} disabled={loading}>
+                {loading ? "Processing..." : mode === "Razorpay Online" ? "Pay with Razorpay" : "Save Payment"}
+              </Button>
               <Button variant="outline" onClick={() => setAmount(0)}>Reset</Button>
             </div>
           </div>

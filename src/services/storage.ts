@@ -25,7 +25,6 @@ export const KEYS = {
   seeded: "seeded",
   salaries: "salaries",
   certificates: "certificates",
-  staffAttendance: "staffAttendance",
 } as const;
 
 const isBrowser = () => typeof window !== "undefined";

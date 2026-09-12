@@ -203,10 +203,10 @@ export function buildAttendance(students: Student[]) {
 
 export function buildExams() {
   return [
-    { id: "exm-1", name: "Unit Test I", type: "Unit Test", session: SESSION, startDate: "2025-07-10", endDate: "2025-07-15", maxMarks: 25, passMarks: 9, status: "Completed" },
-    { id: "exm-2", name: "Half Yearly", type: "Half Yearly", session: SESSION, startDate: "2025-09-18", endDate: "2025-09-28", maxMarks: 100, passMarks: 33, status: "Completed" },
-    { id: "exm-3", name: "Pre-Board", type: "Pre-Board", session: SESSION, startDate: "2025-12-05", endDate: "2025-12-15", maxMarks: 100, passMarks: 33, status: "Scheduled" },
-    { id: "exm-4", name: "Annual Examination", type: "Annual Examination", session: SESSION, startDate: "2026-03-02", endDate: "2026-03-18", maxMarks: 100, passMarks: 33, status: "Scheduled" },
+    { id: "exm-1", name: "Unit Test I", type: "Unit Test", session: SESSION, className: "Class 10", startDate: "2025-07-10", endDate: "2025-07-15", maxMarks: 25, passMarks: 9, status: "Completed" },
+    { id: "exm-2", name: "Half Yearly", type: "Half Yearly", session: SESSION, className: "Class 10", startDate: "2025-09-18", endDate: "2025-09-28", maxMarks: 100, passMarks: 33, status: "Completed" },
+    { id: "exm-3", name: "Pre-Board", type: "Pre-Board", session: SESSION, className: "Class 10", startDate: "2025-12-05", endDate: "2025-12-15", maxMarks: 100, passMarks: 33, status: "Upcoming" },
+    { id: "exm-4", name: "Annual Examination", type: "Annual Examination", session: SESSION, className: "Class 10", startDate: "2026-03-02", endDate: "2026-03-18", maxMarks: 100, passMarks: 33, status: "Upcoming" },
   ];
 }
 

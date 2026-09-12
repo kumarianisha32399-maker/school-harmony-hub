@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Loader2, Inbox } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -60,13 +60,12 @@ export function TextField({
   placeholder?: string;
   required?: boolean;
 }) {
-  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label} {required && <span className="text-destructive">*</span>}
       </Label>
-      <Input id={id} type={type} value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      <Input type={type} value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -82,12 +81,10 @@ export function SelectField({
   onChange: (v: string) => void;
   options: (string | { value: string; label: string })[];
 }) {
-  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
       <select
-        id={id}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"

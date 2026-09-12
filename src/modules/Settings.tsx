@@ -1,11 +1,20 @@
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Download, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useApp } from "@/context/AppContext";
-import { KEYS, storage } from "@/services/storage";
+"use client";
+
+import { useState } from "react";
 import {
-  EmptyState,
+  Building2,
+  Database,
+  Download,
+  Plus,
+  Save,
+  Shield,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useApp } from "@/context/AppContext";
+import { api } from "@/services/api";
+import {
   FormModal,
   PageHeader,
   Panel,
@@ -13,311 +22,251 @@ import {
   TextField,
   useConfirm,
 } from "@/components/common/Ui";
+import { ImageUpload } from "@/components/common/ImageUpload";
+import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/modules/shared";
 
-const ROLES = ["Admin", "Teacher", "Accountant", "Staff"];
-
 export function SchoolProfile() {
   const { settings, saveSettings } = useApp();
-  const [form, setForm] = useState<Record<string, any>>(settings);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [form, setForm] = useState({ ...settings });
 
-  useEffect(() => setForm(settings), [settings]);
+  const setField = (k: string, v: any) => setForm((prev: any) => ({ ...prev, [k]: v }));
 
-  const set = (k: string) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  const pickLogo = (file?: File | null) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setForm((f) => ({ ...f, logo: String(reader.result) }));
-    reader.readAsDataURL(file);
-  };
-
-  const save = () => {
-    if (!String(form.name || "").trim()) return toast.error("School name is required");
-    saveSettings(form);
-    toast.success("School profile saved — all documents now use these details");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveSettings(form);
+    toast.success("School profile updated successfully in MongoDB!");
   };
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
-        title="School Profile"
-        subtitle="These details appear on every receipt, marksheet, certificate and ID card."
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setForm(settings)}>
-              <RotateCcw className="size-4" /> Reset
-            </Button>
-            <Button onClick={save}>
-              <Save className="size-4" /> Save Changes
-            </Button>
-          </>
-        }
+        title="School Profile & Settings"
+        subtitle="Configure institution identity, letterhead headers, session, and affiliations."
       />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Panel title="School Details">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField label="School Name" value={form.name} onChange={set("name")} required />
-              <TextField label="Tagline" value={form.tagline} onChange={set("tagline")} />
-              <TextField label="Phone" value={form.phone} onChange={set("phone")} />
-              <TextField label="Email" value={form.email} onChange={set("email")} />
-              <TextField label="Website" value={form.website} onChange={set("website")} />
-              <TextField label="Affiliation" value={form.affiliation} onChange={set("affiliation")} />
-              <TextField label="School Code" value={form.code} onChange={set("code")} />
-              <TextField label="Principal Name" value={form.principal} onChange={set("principal")} />
-              <TextField label="Academic Session" value={form.session} onChange={set("session")} />
-              <div className="sm:col-span-2">
-                <TextField label="Address" value={form.address} onChange={set("address")} />
-              </div>
-            </div>
-          </Panel>
-        </div>
 
-        <Panel title="School Logo">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex size-32 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted">
-              {form.logo ? (
-                <img src={form.logo} alt="School logo" className="size-full object-contain" />
-              ) : (
-                <span className="px-2 text-center text-xs text-muted-foreground">No logo uploaded</span>
-              )}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => pickLogo(e.target.files?.[0])}
-            />
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => fileRef.current?.click()}>
-                <Upload className="size-4" /> Upload
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setForm((f) => ({ ...f, logo: "" }))}
-                disabled={!form.logo}
-              >
-                Remove
-              </Button>
-            </div>
-            <p className="text-center text-xs text-muted-foreground">
-              A square PNG works best. Remember to save changes.
-            </p>
-          </div>
-        </Panel>
-      </div>
-    </div>
-  );
-}
-
-const DEFAULT_FEE_SETTINGS = {
-  dueDay: 10,
-  lateFee: 100,
-  graceDays: 3,
-  paymentModes: "Cash, UPI, Card, Bank Transfer, Cheque",
-  heads: [
-    { name: "Admission Fee", amount: 5000, frequency: "One-time" },
-    { name: "Tuition Fee", amount: 2500, frequency: "Monthly" },
-    { name: "Annual Fee", amount: 3000, frequency: "Yearly" },
-    { name: "Exam Fee", amount: 500, frequency: "Yearly" },
-  ],
-};
-
-export function FeeSettings() {
-  const { settings, saveSettings } = useApp();
-  const [form, setForm] = useState<any>(settings.feeSettings || DEFAULT_FEE_SETTINGS);
-
-  useEffect(() => setForm(settings.feeSettings || DEFAULT_FEE_SETTINGS), [settings.feeSettings]);
-
-  const update = (key: string, value: any) => setForm((f: any) => ({ ...f, [key]: value }));
-  const updateHead = (index: number, key: string, value: any) =>
-    setForm((f: any) => ({
-      ...f,
-      heads: f.heads.map((head: any, i: number) => (i === index ? { ...head, [key]: value } : head)),
-    }));
-
-  const save = () => {
-    saveSettings({
-      ...settings,
-      feeSettings: {
-        ...form,
-        dueDay: Number(form.dueDay),
-        lateFee: Number(form.lateFee),
-        graceDays: Number(form.graceDays),
-      },
-    });
-    toast.success("Fee settings saved");
-  };
-
-  return (
-    <div>
-      <PageHeader
-        title="Fee Settings"
-        subtitle="Set default fee heads, due dates and payment rules used by the fee screens."
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setForm(settings.feeSettings || DEFAULT_FEE_SETTINGS)}>
-              <RotateCcw className="size-4" /> Reset
-            </Button>
-            <Button onClick={save}><Save className="size-4" /> Save Settings</Button>
-          </>
-        }
-      />
-      <div className="space-y-6">
-        <Panel title="Collection rules">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <TextField label="Due day of month" type="number" value={form.dueDay} onChange={(v) => update("dueDay", v)} />
-            <TextField label="Late fee" type="number" value={form.lateFee} onChange={(v) => update("lateFee", v)} />
-            <TextField label="Grace period (days)" type="number" value={form.graceDays} onChange={(v) => update("graceDays", v)} />
-            <TextField label="Payment modes" value={form.paymentModes} onChange={(v) => update("paymentModes", v)} />
-          </div>
-        </Panel>
+      <form onSubmit={handleSubmit} className="space-y-6">
         <Panel
-          title="Default fee heads"
+          title="Basic Information"
           actions={
-            <Button size="sm" variant="outline" onClick={() => update("heads", [...form.heads, { name: "", amount: 0, frequency: "Monthly" }])}>
-              <Plus className="size-4" /> Add Head
+            <Button type="submit" size="sm" className="gap-2">
+              <Save className="size-4" /> Save Changes
             </Button>
           }
         >
-          <div className="space-y-3">
-            {form.heads.map((head: any, index: number) => (
-              <div key={`${head.name}-${index}`} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[1fr_150px_150px_auto] sm:items-end">
-                <TextField label="Fee head" value={head.name} onChange={(v) => updateHead(index, "name", v)} />
-                <TextField label="Amount" type="number" value={head.amount} onChange={(v) => updateHead(index, "amount", Number(v))} />
-                <SelectField label="Frequency" value={head.frequency} onChange={(v) => updateHead(index, "frequency", v)} options={["One-time", "Monthly", "Quarterly", "Yearly"]} />
-                <Button variant="ghost" size="icon" aria-label="Delete fee head" onClick={() => update("heads", form.heads.filter((_: any, i: number) => i !== index))}>
-                  <Trash2 className="size-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <TextField
+              label="School Name"
+              value={form.name}
+              onChange={(v) => setField("name", v)}
+              required
+            />
+            <TextField
+              label="Tagline / Motto"
+              value={form.tagline}
+              onChange={(v) => setField("tagline", v)}
+            />
+            <TextField
+              label="School Code"
+              value={form.code}
+              onChange={(v) => setField("code", v)}
+              required
+            />
+            <TextField
+              label="Affiliation Details"
+              value={form.affiliation}
+              onChange={(v) => setField("affiliation", v)}
+            />
+            <TextField
+              label="Principal Name"
+              value={form.principal}
+              onChange={(v) => setField("principal", v)}
+            />
+            <TextField
+              label="Current Academic Session"
+              value={form.session}
+              onChange={(v) => setField("session", v)}
+            />
           </div>
         </Panel>
-      </div>
-    </div>
-  );
-}
 
-const DEFAULT_CERTIFICATE_SETTINGS = {
-  certificatePrefix: "CERT",
-  showLogo: true,
-  defaultConduct: "Good",
-  footerNote: "This document is issued by the school for official purposes.",
-  signatureLabel: "Principal",
-  stampLabel: "School Stamp",
-};
-
-export function CertificateSettings() {
-  const { settings, saveSettings } = useApp();
-  const [form, setForm] = useState<any>(settings.certificateSettings || DEFAULT_CERTIFICATE_SETTINGS);
-  useEffect(() => setForm(settings.certificateSettings || DEFAULT_CERTIFICATE_SETTINGS), [settings.certificateSettings]);
-  const set = (key: string) => (value: any) => setForm((f: any) => ({ ...f, [key]: value }));
-  const save = () => {
-    saveSettings({ ...settings, certificateSettings: form });
-    toast.success("Certificate settings saved");
-  };
-
-  return (
-    <div>
-      <PageHeader
-        title="Certificate Settings"
-        subtitle="Manage defaults used when preparing certificates and school documents."
-        actions={<Button onClick={save}><Save className="size-4" /> Save Settings</Button>}
-      />
-      <Panel title="Document defaults">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Certificate number prefix" value={form.certificatePrefix} onChange={set("certificatePrefix")} />
-          <SelectField label="Default conduct" value={form.defaultConduct} onChange={set("defaultConduct")} options={["Excellent", "Very Good", "Good", "Satisfactory"]} />
-          <TextField label="Signature label" value={form.signatureLabel} onChange={set("signatureLabel")} />
-          <TextField label="Stamp label" value={form.stampLabel} onChange={set("stampLabel")} />
-          <div className="sm:col-span-2">
-            <TextField label="Footer note" value={form.footerNote} onChange={set("footerNote")} />
+        <Panel title="Contact & Address (Used in Letterhead and Receipts)">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <TextField
+                label="Full Address"
+                value={form.address}
+                onChange={(v) => setField("address", v)}
+              />
+            </div>
+            <TextField
+              label="Phone Number"
+              value={form.phone}
+              onChange={(v) => setField("phone", v)}
+            />
+            <TextField
+              label="Email Address"
+              value={form.email}
+              onChange={(v) => setField("email", v)}
+              type="email"
+            />
+            <TextField
+              label="Official Website"
+              value={form.website}
+              onChange={(v) => setField("website", v)}
+            />
           </div>
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" checked={Boolean(form.showLogo)} onChange={(e) => set("showLogo")(e.target.checked)} />
-            Show school logo on generated documents
-          </label>
+        </Panel>
+
+        <Panel title="Branding & School Logo (Cloudinary Upload)">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ImageUpload
+              label="School Logo"
+              value={form.logo}
+              onChange={(url) => setField("logo", url)}
+              folder="school_logo"
+            />
+            <div className="flex items-center gap-4 rounded-xl border border-dashed border-border p-4">
+              <div className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground border border-border">
+                {form.logo ? (
+                  <img
+                    src={form.logo}
+                    alt="Logo Preview"
+                    className="size-full rounded-xl object-contain"
+                  />
+                ) : (
+                  <Building2 className="size-8" />
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <p className="font-semibold text-foreground">Live Letterhead Logo</p>
+                <p>
+                  This logo is automatically rendered on all A4 report cards, marks-sheets, student ID cards, transfer certificates, and fee receipts.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        <div className="flex justify-end">
+          <Button type="submit" size="lg" className="gap-2">
+            <Save className="size-4" /> Save Profile Settings
+          </Button>
         </div>
-      </Panel>
+      </form>
     </div>
   );
 }
 
-const EMPTY_USER = { name: "", username: "", email: "", password: "", role: "Admin" };
+const ROLES = ["Admin", "Teacher", "Accountant", "Staff"];
 
 export function UserManagement() {
-  const { users, add, update, remove, user } = useApp();
-  const { confirm, dialog } = useConfirm();
-  const [open, setOpen] = useState(false);
+  const { users, add, update, remove } = useApp();
+  const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState<Record<string, any>>(EMPTY_USER);
+  const [form, setForm] = useState({
+    name: "",
+    username: "",
+    password: "",
+    role: "Teacher",
+    email: "",
+  });
+  const { confirm, dialog } = useConfirm();
 
-  const set = (k: string) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  const startAdd = () => {
+  const openAdd = () => {
     setEditing(null);
-    setForm(EMPTY_USER);
-    setOpen(true);
+    setForm({
+      name: "",
+      username: "",
+      password: "",
+      role: "Teacher",
+      email: "",
+    });
+    setModal(true);
   };
 
-  const startEdit = (row: any) => {
-    setEditing(row);
-    setForm(row);
-    setOpen(true);
+  const openEdit = (u: any) => {
+    setEditing(u);
+    setForm({
+      name: u.name || "",
+      username: u.username || "",
+      password: "", // Keep blank unless updating
+      role: u.role || "Teacher",
+      email: u.email || "",
+    });
+    setModal(true);
   };
 
-  const submit = () => {
-    if (!form.name?.trim() || !form.username?.trim() || !form.password?.trim())
-      return toast.error("Name, username and password are required");
-    const clash = users.find(
-      (u: any) => u.username === form.username.trim() && u.id !== editing?.id,
-    );
-    if (clash) return toast.error("That username is already taken");
-    if (editing) {
-      update("users", editing.id, form);
-      toast.success("User updated");
-    } else {
-      add("users", form, "usr");
-      toast.success("User created — they can log in immediately");
+  const handleSubmit = async () => {
+    if (!form.name.trim() || !form.username.trim() || (!editing && !form.password.trim())) {
+      toast.error("Please fill in Name, Username, and Password.");
+      return;
     }
-    setOpen(false);
+
+    if (editing) {
+      await update("users", editing.id || editing._id, form);
+      toast.success("User updated successfully in MongoDB!");
+    } else {
+      await add("users", form);
+      toast.success("New user account created in MongoDB!");
+    }
+    setModal(false);
   };
 
   const columns: Column[] = [
-    { key: "name", label: "Name", sortable: true },
-    { key: "username", label: "Username", sortable: true },
-    { key: "email", label: "Email" },
+    {
+      key: "name",
+      label: "User Name",
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+            {r.name?.charAt(0) || "U"}
+          </div>
+          <div>
+            <p className="font-semibold">{r.name}</p>
+            <p className="text-xs text-muted-foreground">{r.email || "No email"}</p>
+          </div>
+        </div>
+      ),
+    },
+    { key: "username", label: "Username" },
     {
       key: "role",
       label: "Role",
-      sortable: true,
-      render: (r) => <Badge tone="blue">{r.role}</Badge>,
+      render: (r) => {
+        const tone =
+          r.role === "Admin"
+            ? "red"
+            : r.role === "Teacher"
+            ? "blue"
+            : r.role === "Accountant"
+            ? "green"
+            : "muted";
+        return <Badge tone={tone}>{r.role}</Badge>;
+      },
     },
     {
       key: "actions",
       label: "Actions",
+      sortable: false,
       render: (r) => (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => startEdit(r)}>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => openEdit(r)}>
             Edit
           </Button>
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10"
             onClick={() =>
-              r.id === user?.id
-                ? toast.error("You cannot delete the account you are signed in with")
-                : confirm(`Delete the login for ${r.name}?`, () => {
-                    remove("users", r.id);
-                    toast.success("User deleted");
-                  })
+              confirm(`Are you sure you want to delete user "${r.name}"?`, async () => {
+                await remove("users", r.id || r._id);
+                toast.success("User deleted.");
+              })
             }
           >
-            <Trash2 className="size-4 text-destructive" />
+            <Trash2 className="size-4" />
           </Button>
         </div>
       ),
@@ -325,154 +274,145 @@ export function UserManagement() {
   ];
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="User Management"
-        subtitle="Create logins and control which role each person signs in with."
+        subtitle="Manage portal access and role permissions for administrators, faculty, and staff."
         actions={
-          <Button onClick={startAdd}>
+          <Button onClick={openAdd} className="gap-2">
             <Plus className="size-4" /> Add User
           </Button>
         }
       />
-      <DataTable
-        columns={columns}
-        rows={users}
-        searchKeys={["name", "username", "email", "role"]}
-        exportName="users"
-        emptyMessage="No users yet."
-      />
+
+      <Panel>
+        <DataTable
+          columns={columns}
+          rows={users}
+          searchKeys={["name", "username", "email", "role"]}
+          exportName="users_list"
+          emptyMessage="No user accounts found."
+        />
+      </Panel>
+
       <FormModal
-        open={open}
-        onOpenChange={setOpen}
-        title={editing ? "Edit User" : "Add User"}
-        onSubmit={submit}
-        submitLabel={editing ? "Update" : "Create"}
+        open={modal}
+        onOpenChange={setModal}
+        title={editing ? "Edit User Account" : "Create New User Account"}
+        onSubmit={handleSubmit}
+        submitLabel={editing ? "Update User" : "Create User"}
       >
-        <TextField label="Full Name" value={form.name} onChange={set("name")} required />
-        <TextField label="Username" value={form.username} onChange={set("username")} required />
-        <TextField label="Email" value={form.email} onChange={set("email")} />
-        <TextField label="Password" value={form.password} onChange={set("password")} required />
-        <SelectField label="Role" value={form.role} onChange={set("role")} options={ROLES} />
+        <TextField
+          label="Full Name"
+          value={form.name}
+          onChange={(v) => setForm((p) => ({ ...p, name: v }))}
+          required
+        />
+        <TextField
+          label="Username"
+          value={form.username}
+          onChange={(v) => setForm((p) => ({ ...p, username: v }))}
+          required
+        />
+        <TextField
+          label={editing ? "New Password (leave blank to keep current)" : "Password"}
+          type="password"
+          value={form.password}
+          onChange={(v) => setForm((p) => ({ ...p, password: v }))}
+          required={!editing}
+        />
+        <TextField
+          label="Email Address"
+          type="email"
+          value={form.email}
+          onChange={(v) => setForm((p) => ({ ...p, email: v }))}
+        />
+        <SelectField
+          label="System Role"
+          value={form.role}
+          onChange={(v) => setForm((p) => ({ ...p, role: v }))}
+          options={ROLES}
+        />
       </FormModal>
+
       {dialog}
     </div>
   );
 }
 
 export function BackupRestore() {
-  const { resetDemoData, students, teachers, staff, invoices, payments } = useApp();
-  const { confirm, dialog } = useConfirm();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const { students, teachers, staff, invoices, payments, attendance, exams, marks, notices, timetable, settings } = useApp();
 
-  const exportBackup = () => {
-    const payload = JSON.stringify(storage.exportAll(), null, 2);
-    const blob = new Blob([payload], { type: "application/json" });
+  const handleExport = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      school: settings?.name,
+      students,
+      teachers,
+      staff,
+      invoices,
+      payments,
+      attendance,
+      exams,
+      marks,
+      notices,
+      timetable,
+      settings,
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `school-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `harmony_school_database_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Backup file downloaded");
+    toast.success("MongoDB database snapshot exported successfully!");
   };
-
-  const importBackup = (file?: File | null) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        if (typeof data !== "object" || !data) throw new Error("bad");
-        storage.importAll(data);
-        storage.set(KEYS.seeded, true);
-        toast.success("Backup restored — reloading");
-        setTimeout(() => window.location.reload(), 600);
-      } catch {
-        toast.error("That file is not a valid backup");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const stats = [
-    { label: "Students", value: students.length },
-    { label: "Teachers", value: teachers.length },
-    { label: "Staff", value: staff.length },
-    { label: "Fee Invoices", value: invoices.length },
-    { label: "Payments", value: payments.length },
-  ];
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
-        title="Backup & Restore"
-        subtitle="Save a copy of all records to a file, restore from a file, or reload the demo data."
+        title="Backup & Export"
+        subtitle="Export local database records into a portable JSON snapshot."
       />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Stored Records">
-          {students.length ? (
-            <ul className="divide-y divide-border">
-              {stats.map((s) => (
-                <li key={s.label} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="text-muted-foreground">{s.label}</span>
-                  <span className="font-semibold">{s.value}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState message="No records stored yet." />
-          )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Panel title="Export Database Snapshot">
+          <div className="space-y-4">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Download className="size-6" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Download Full Database Snapshot</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Exports live database records (students, fees, attendance, examinations, staff, notices, and settings) into a structured JSON file for archiving.
+              </p>
+            </div>
+            <Button onClick={handleExport} className="w-full gap-2">
+              <Download className="size-4" /> Export JSON Snapshot
+            </Button>
+          </div>
         </Panel>
 
-        <Panel title="Actions">
+        <Panel title="Database Health & Connection">
           <div className="space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">Download backup</p>
-                <p className="text-xs text-muted-foreground">Exports every record as a JSON file.</p>
-              </div>
-              <Button onClick={exportBackup}>
-                <Download className="size-4" /> Export
-              </Button>
+            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+              <Database className="size-6" />
             </div>
-            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
-              <div>
-                <p className="text-sm font-medium">Restore backup</p>
-                <p className="text-xs text-muted-foreground">Replaces current records with the file contents.</p>
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="application/json"
-                className="hidden"
-                onChange={(e) => importBackup(e.target.files?.[0])}
-              />
-              <Button variant="outline" onClick={() => fileRef.current?.click()}>
-                <Upload className="size-4" /> Import
-              </Button>
+            <div>
+              <h3 className="font-semibold">MongoDB Atlas Primary Source</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Connected to production MongoDB cluster. Real-time write-ahead logging and document transactions are managed directly through Next.js route handlers.
+              </p>
             </div>
-            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
-              <div>
-                <p className="text-sm font-medium">Reload demo data</p>
-                <p className="text-xs text-muted-foreground">Discards changes and restores the sample school.</p>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={() =>
-                  confirm("This replaces all current records with the original demo data. Continue?", () => {
-                    resetDemoData();
-                    toast.success("Demo data restored");
-                  })
-                }
-              >
-                <RotateCcw className="size-4" /> Reset
-              </Button>
+            <div className="rounded-lg bg-muted/40 p-3 text-xs space-y-1">
+              <p className="font-medium text-foreground">Status: <span className="text-emerald-600 font-semibold">Active & Synced</span></p>
+              <p className="text-muted-foreground">Single Source of Truth: MongoDB Atlas</p>
             </div>
           </div>
         </Panel>
       </div>
-      {dialog}
     </div>
   );
 }

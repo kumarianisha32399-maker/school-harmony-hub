@@ -393,7 +393,8 @@ export function TeacherAttendance() {
 }
 
 export function Payroll() {
-  const { teachers, staff, salaries, add, settings } = useApp();
+  const { teachers, staff, salaries, add, remove, settings } = useApp();
+  const { confirm, dialog } = useConfirm();
   const people = useMemo(
     () => [
       ...teachers.map((t: any) => ({ ...t, designation: `Teacher — ${t.subject}` })),
@@ -514,6 +515,43 @@ export function Payroll() {
               { key: "basic", label: "Basic", render: (r: any) => inr(r.basic) },
               { key: "net", label: "Net Paid", render: (r: any) => inr(r.net) },
               { key: "date", label: "Date", render: (r: any) => fmtDate(r.date) },
+              {
+                key: "actions",
+                label: "Actions",
+                sortable: false,
+                render: (r: any) => (
+                  <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="View & Print Slip"
+                      aria-label="View & Print Slip"
+                      onClick={() => {
+                        setSlip(r);
+                        window.scrollTo({ top: 400, behavior: "smooth" });
+                        toast.info(`Loaded salary slip for ${r.name}`);
+                      }}
+                    >
+                      <Eye className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Delete Record"
+                      aria-label="Delete Record"
+                      onClick={() =>
+                        confirm(`Delete salary record for ${r.name} (${r.month})?`, () => {
+                          remove("salaries", r.id);
+                          if (slip?.id === r.id) setSlip(null);
+                          toast.success("Salary payment record deleted.");
+                        })
+                      }
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                ),
+              },
             ]}
             rows={salaries}
             searchKeys={["name", "month", "designation"]}
@@ -522,6 +560,7 @@ export function Payroll() {
           />
         </Panel>
       </div>
+      {dialog}
     </>
   );
 }

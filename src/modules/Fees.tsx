@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/services/api";
 import { DataTable } from "@/components/common/DataTable";
@@ -577,14 +577,94 @@ export function FeeDefaulters() {
 }
 
 export function PaymentHistory() {
-  const { payments, students, remove } = useApp();
+  const { payments, students, invoices, settings, remove } = useApp();
   const { confirm, dialog } = useConfirm();
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+
   const rows = payments.map((p: any) => ({
     ...p, name: students.find((s: any) => s.id === p.studentId)?.name || "—",
   }));
+
+  const s = selectedReceipt ? students.find((x: any) => x.id === selectedReceipt.studentId) : null;
+  const inv = selectedReceipt ? invoices.find((x: any) => x.id === selectedReceipt.invoiceId) : null;
+  const total = inv ? invoiceTotal(inv) : selectedReceipt?.amount || 0;
+
   return (
     <div>
-      <PageHeader title="Payment History" subtitle={`${rows.length} payments recorded`} />
+      <PageHeader
+        title="Payment History"
+        subtitle={`${rows.length} payments recorded`}
+        actions={
+          selectedReceipt && (
+            <Button variant="outline" onClick={() => setSelectedReceipt(null)}>
+              Back to list
+            </Button>
+          )
+        }
+      />
+
+      {selectedReceipt && s && (
+        <div className="mb-8 mt-2 space-y-4">
+          <DocToolbar docId="receipt-history-doc" />
+          <A4Document id="receipt-history-doc" title="Fee Receipt">
+            <div className="flex justify-between text-[11px] font-semibold">
+              <span>Receipt No: {selectedReceipt.receiptNo}</span>
+              <span>Date: {fmtDate(selectedReceipt.date)}</span>
+            </div>
+            <div className="mt-4 grid gap-x-8 sm:grid-cols-2">
+              <Field label="Student Name" value={s.name} />
+              <Field label="Admission Number" value={s.admissionNo} />
+              <Field label="Father's Name" value={s.father} />
+              <Field label="Class / Section" value={`${s.className} - ${s.section}`} />
+              <Field label="Month" value={inv?.month || "April"} />
+              <Field label="Session" value={settings.session} />
+            </div>
+            <table className="mt-5 w-full border border-slate-800 text-[11px]">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="border border-slate-800 px-2 py-1 text-left">#</th>
+                  <th className="border border-slate-800 px-2 py-1 text-left">Particulars</th>
+                  <th className="border border-slate-800 px-2 py-1 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(inv?.items || [{ head: "Fee Payment", amount: selectedReceipt.amount }]).map((it: any, i: number) => (
+                  <tr key={it.head}>
+                    <td className="border border-slate-800 px-2 py-1">{i + 1}</td>
+                    <td className="border border-slate-800 px-2 py-1">{it.head}</td>
+                    <td className="border border-slate-800 px-2 py-1 text-right">{inr(it.amount)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={2} className="border border-slate-800 px-2 py-1 text-right font-semibold">Late Fee</td>
+                  <td className="border border-slate-800 px-2 py-1 text-right">{inr(inv?.lateFee || 0)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="border border-slate-800 px-2 py-1 text-right font-semibold">Discount</td>
+                  <td className="border border-slate-800 px-2 py-1 text-right">- {inr(inv?.discount || 0)}</td>
+                </tr>
+                <tr className="bg-slate-100 font-bold">
+                  <td colSpan={2} className="border border-slate-800 px-2 py-1 text-right">Total</td>
+                  <td className="border border-slate-800 px-2 py-1 text-right">{inr(total)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="border border-slate-800 px-2 py-1 text-right font-semibold">Amount Paid</td>
+                  <td className="border border-slate-800 px-2 py-1 text-right">{inr(selectedReceipt.amount)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="border border-slate-800 px-2 py-1 text-right font-semibold">Balance</td>
+                  <td className="border border-slate-800 px-2 py-1 text-right">{inr(Math.max(0, total - (inv?.paid ?? selectedReceipt.amount)))}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="mt-4 flex justify-between text-[11px]">
+              <p><b>Payment Mode:</b> {selectedReceipt.mode} • <b>Received By:</b> {selectedReceipt.receivedBy || selectedReceipt.collectedBy || "Accounts"}</p>
+            </div>
+            <SignRow items={["Depositor Signature", "Cashier / Accountant", "Principal"]} />
+          </A4Document>
+        </div>
+      )}
+
       <DataTable exportName="payments" rows={rows} searchKeys={["receiptNo", "name", "mode"]}
         columns={[
           { key: "receiptNo", label: "Receipt" },
@@ -592,14 +672,24 @@ export function PaymentHistory() {
           { key: "date", label: "Date", render: (r) => fmtDate(r.date) },
           { key: "amount", label: "Amount", render: (r) => inr(r.amount) },
           { key: "mode", label: "Mode" },
-          { key: "receivedBy", label: "Received By" },
+          { key: "receivedBy", label: "Received By", render: (r) => r.receivedBy || r.collectedBy || "Accounts" },
           {
-            key: "act", label: "", sortable: false,
+            key: "act", label: "Actions", sortable: false,
             render: (r) => (
-              <Button size="icon" variant="ghost" aria-label="Delete"
-                onClick={() => confirm(`Delete receipt ${r.receiptNo}?`, () => { remove("payments", r.id); toast.success("Payment deleted."); })}>
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
+              <div className="flex gap-1">
+                <Button size="icon" variant="ghost" aria-label="View Receipt" title="View & Print Receipt"
+                  onClick={() => { setSelectedReceipt(r); window.scrollTo({ top: 0, behavior: "smooth" }); toast.info(`Viewing receipt ${r.receiptNo}`); }}>
+                  <Eye className="size-4" />
+                </Button>
+                <Button size="icon" variant="ghost" aria-label="Delete Receipt" title="Delete Payment Record"
+                  onClick={() => confirm(`Delete receipt ${r.receiptNo}?`, () => {
+                    remove("payments", r.id);
+                    if (selectedReceipt?.id === r.id) setSelectedReceipt(null);
+                    toast.success("Payment deleted.");
+                  })}>
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
             ),
           },
         ]}

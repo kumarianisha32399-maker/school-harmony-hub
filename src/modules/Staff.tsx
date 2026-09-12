@@ -118,8 +118,18 @@ export function TeacherList() {
   const [view, setView] = useState<any>(null);
 
   const columns = [
-    { key: "empId", label: "Emp ID" },
-    { key: "name", label: "Teacher" },
+    {
+      key: "name",
+      label: "Teacher",
+      render: (r: any) => (
+        <div className="flex items-center gap-2">
+          {r.photo ? (
+            <img src={r.photo} alt={r.name} className="size-8 rounded-full object-cover border border-border" />
+          ) : null}
+          <span>{r.name}</span>
+        </div>
+      ),
+    },
     { key: "subject", label: "Subject" },
     { key: "qualification", label: "Qualification" },
     { key: "mobile", label: "Mobile" },
@@ -175,6 +185,15 @@ export function TeacherList() {
       {view && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <Panel title={`Profile — ${view.name}`}>
+            {view.photo && (
+              <div className="mb-4 flex items-center gap-4 border-b pb-3">
+                <img src={view.photo} alt={view.name} className="size-16 rounded-xl object-cover border border-border shadow-sm" />
+                <div>
+                  <h4 className="font-semibold">{view.name}</h4>
+                  <p className="text-xs text-muted-foreground">{view.empId} • {view.subject}</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-1 text-sm">
               <Field label="Employee ID" value={view.empId} />
               <Field label="Father's Name" value={view.father} />

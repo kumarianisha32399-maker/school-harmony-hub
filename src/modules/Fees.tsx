@@ -1,42 +1,168 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/services/api";
 import { DataTable } from "@/components/common/DataTable";
-import { EmptyState, PageHeader, Panel, SelectField, TextField, useConfirm } from "@/components/common/Ui";
+import { EmptyState, FormModal, PageHeader, Panel, SelectField, TextField, useConfirm } from "@/components/common/Ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { A4Document, DocToolbar, Field, SignRow } from "@/components/common/A4Document";
 import { fmtDate, inr, invoiceTotal, today } from "@/utils/helpers";
 import { Badge, FEE_HEADS, MONTHS, PAYMENT_MODES, feeSummary, useGoto } from "@/modules/shared";
 
-const STRUCTURE = [
-  { head: "Admission Fee", frequency: "Yearly", amount: 5000 },
-  { head: "Tuition Fee", frequency: "Monthly", amount: 2500 },
-  { head: "Annual Fee", frequency: "Yearly", amount: 6000 },
-  { head: "Exam Fee", frequency: "Quarterly", amount: 400 },
-  { head: "Transport Fee", frequency: "Monthly", amount: 1200 },
-  { head: "Computer Fee", frequency: "Monthly", amount: 300 },
-  { head: "Activity Fee", frequency: "Monthly", amount: 500 },
-  { head: "Other Charges", frequency: "Yearly", amount: 800 },
+const DEFAULT_STRUCTURE = [
+  { id: "fs-0", head: "Admission Fee", frequency: "Yearly", amount: 5000 },
+  { id: "fs-1", head: "Tuition Fee", frequency: "Monthly", amount: 2500 },
+  { id: "fs-2", head: "Annual Fee", frequency: "Yearly", amount: 6000 },
+  { id: "fs-3", head: "Exam Fee", frequency: "Quarterly", amount: 400 },
+  { id: "fs-4", head: "Transport Fee", frequency: "Monthly", amount: 1200 },
+  { id: "fs-5", head: "Computer Fee", frequency: "Monthly", amount: 300 },
+  { id: "fs-6", head: "Activity Fee", frequency: "Monthly", amount: 500 },
+  { id: "fs-7", head: "Other Charges", frequency: "Yearly", amount: 800 },
 ];
 
+export function getStoredFeeStructure(): any[] {
+  if (typeof window === "undefined") return DEFAULT_STRUCTURE;
+  try {
+    const raw = localStorage.getItem("sms:fee_structure");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULT_STRUCTURE;
+}
+
+export function saveStoredFeeStructure(list: any[]) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("sms:fee_structure", JSON.stringify(list));
+    window.dispatchEvent(new Event("storage_fee_structure"));
+  }
+}
+
 export function FeeStructure() {
+  const [list, setList] = useState<any[]>(DEFAULT_STRUCTURE);
+  const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({ head: "", frequency: "Monthly", amount: 1000 });
+  const { confirm, dialog } = useConfirm();
+
+  useEffect(() => {
+    setList(getStoredFeeStructure());
+    const onSync = () => setList(getStoredFeeStructure());
+    window.addEventListener("storage_fee_structure", onSync);
+    return () => window.removeEventListener("storage_fee_structure", onSync);
+  }, []);
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm({ head: "", frequency: "Monthly", amount: 1000 });
+    setOpen(true);
+  };
+
+  const openEdit = (row: any) => {
+    setEditId(row.id);
+    setForm({ head: row.head, frequency: row.frequency, amount: row.amount });
+    setOpen(true);
+  };
+
+  const save = () => {
+    if (!form.head.trim()) {
+      toast.error("Fee Head name is required.");
+      return;
+    }
+    if (form.amount <= 0) {
+      toast.error("Amount must be greater than zero.");
+      return;
+    }
+
+    let updated: any[];
+    if (editId) {
+      updated = list.map((item) => (item.id === editId ? { ...item, ...form } : item));
+      toast.success("Fee structure updated successfully.");
+    } else {
+      const newItem = { id: `fs-${Date.now()}`, ...form };
+      updated = [...list, newItem];
+      toast.success("New fee head added successfully.");
+    }
+    setList(updated);
+    saveStoredFeeStructure(updated);
+    setOpen(false);
+  };
+
+  const remove = (id: string, head: string) => {
+    confirm(`Delete "${head}" from fee structure?`, () => {
+      const updated = list.filter((i) => i.id !== id);
+      setList(updated);
+      saveStoredFeeStructure(updated);
+      toast.success(`${head} removed.`);
+    });
+  };
+
   return (
     <div>
-      <PageHeader title="Fee Structure" subtitle="Standard fee heads applied when generating invoices." />
-      <DataTable exportName="fee-structure" pageSize={10}
-        rows={STRUCTURE.map((r, i) => ({ id: `fs-${i}`, ...r }))}
-        searchKeys={["head"]}
+      <PageHeader
+        title="Fee Structure"
+        subtitle="Manage standard fee heads and customize fee amounts applied when generating invoices."
+        actions={
+          <Button onClick={openAdd}>
+            <Plus className="size-4 mr-1" /> Add Fee Head
+          </Button>
+        }
+      />
+      <DataTable
+        exportName="fee-structure"
+        pageSize={10}
+        rows={list}
+        searchKeys={["head", "frequency"]}
         columns={[
           { key: "head", label: "Fee Head" },
           { key: "frequency", label: "Frequency" },
           { key: "amount", label: "Amount", render: (r) => inr(r.amount) },
+          {
+            key: "actions",
+            label: "Actions",
+            sortable: false,
+            render: (r) => (
+              <div className="flex gap-1">
+                <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Edit">
+                  <Pencil className="size-4" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={() => remove(r.id, r.head)} aria-label="Delete">
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
+            ),
+          },
         ]}
       />
+      <FormModal
+        open={open}
+        onOpenChange={setOpen}
+        title={editId ? "Edit Fee Head" : "Add Fee Head"}
+        onSubmit={save}
+      >
+        <TextField
+          label="Fee Head Name"
+          value={form.head}
+          onChange={(v) => setForm((f) => ({ ...f, head: v }))}
+          required
+        />
+        <SelectField
+          label="Frequency"
+          value={form.frequency}
+          onChange={(v) => setForm((f) => ({ ...f, frequency: v }))}
+          options={["Monthly", "Quarterly", "Half Yearly", "Yearly", "One Time"]}
+        />
+        <TextField
+          label="Amount (₹)"
+          type="number"
+          value={form.amount}
+          onChange={(v) => setForm((f) => ({ ...f, amount: Number(v) }))}
+          required
+        />
+      </FormModal>
+      {dialog}
     </div>
   );
 }
@@ -45,12 +171,20 @@ export function GenerateFee() {
   const { students, invoices, add } = useApp();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [month, setMonth] = useState(MONTHS[0]);
+  const [structureList, setStructureList] = useState<any[]>(DEFAULT_STRUCTURE);
   const [heads, setHeads] = useState<string[]>(["Tuition Fee", "Exam Fee"]);
   const [discount, setDiscount] = useState(0);
   const [lateFee, setLateFee] = useState(0);
   const [dueDate, setDueDate] = useState(today());
 
-  const items = heads.map((h) => ({ head: h, amount: STRUCTURE.find((s) => s.head === h)?.amount || 0 }));
+  useEffect(() => {
+    setStructureList(getStoredFeeStructure());
+    const onSync = () => setStructureList(getStoredFeeStructure());
+    window.addEventListener("storage_fee_structure", onSync);
+    return () => window.removeEventListener("storage_fee_structure", onSync);
+  }, []);
+
+  const items = heads.map((h) => ({ head: h, amount: structureList.find((s) => s.head === h)?.amount || 0 }));
   const subtotal = items.reduce((a, b) => a + b.amount, 0);
   const total = subtotal + Number(lateFee) - Number(discount);
   const prev = studentId ? feeSummary(invoices, studentId).pending : 0;
@@ -85,14 +219,14 @@ export function GenerateFee() {
           </Panel>
           <Panel title="Fee Heads">
             <div className="grid gap-2 sm:grid-cols-2">
-              {FEE_HEADS.map((h) => (
-                <label key={h} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              {structureList.map((item) => (
+                <label key={item.id || item.head} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                   <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={heads.includes(h)}
-                      onChange={(e) => setHeads((p) => (e.target.checked ? [...p, h] : p.filter((x) => x !== h)))} />
-                    {h}
+                    <input type="checkbox" checked={heads.includes(item.head)}
+                      onChange={(e) => setHeads((p) => (e.target.checked ? [...p, item.head] : p.filter((x) => x !== item.head)))} />
+                    {item.head}
                   </span>
-                  <span className="font-semibold">{inr(STRUCTURE.find((s) => s.head === h)?.amount || 0)}</span>
+                  <span className="font-semibold">{inr(item.amount)}</span>
                 </label>
               ))}
             </div>

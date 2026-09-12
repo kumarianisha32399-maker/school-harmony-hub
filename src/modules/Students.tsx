@@ -134,9 +134,17 @@ export function StudentList() {
             label: "Student",
             render: (r) => (
               <div className="flex items-center gap-2">
-                <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                  {initials(r.name)}
-                </span>
+                {r.photo ? (
+                  <img
+                    src={r.photo}
+                    alt={r.name}
+                    className="size-8 rounded-full object-cover border border-border"
+                  />
+                ) : (
+                  <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                    {initials(r.name)}
+                  </span>
+                )}
                 <span>
                   <span className="block font-medium">{r.name}</span>
                   <span className="block text-xs text-muted-foreground">{r.father}</span>
@@ -253,6 +261,19 @@ export function StudentProfile({ id }: { id: string }) {
 
         <TabsContent value="personal">
           <Panel>
+            {student.photo && (
+              <div className="mb-6 flex items-center gap-4 border-b pb-4">
+                <img
+                  src={student.photo}
+                  alt={student.name}
+                  className="size-20 rounded-xl object-cover border-2 border-primary/20 shadow-sm"
+                />
+                <div>
+                  <h3 className="text-lg font-bold">{student.name}</h3>
+                  <p className="text-sm text-muted-foreground">{student.admissionNo} • Class {student.className}-{student.section}</p>
+                </div>
+              </div>
+            )}
             <div className="grid gap-x-8 sm:grid-cols-2">
               <Field label="Admission Number" value={student.admissionNo} />
               <Field label="Date of Birth" value={fmtDate(student.dob)} />
@@ -444,9 +465,17 @@ export function IdCard() {
                 <p className="text-[7px] leading-tight">{settings.address}</p>
               </div>
               <div className="flex flex-col items-center gap-1 p-3">
-                <div className="flex size-16 items-center justify-center rounded-full border-2 border-slate-800 text-lg font-black">
-                  {initials(s.name)}
-                </div>
+                {s.photo ? (
+                  <img
+                    src={s.photo}
+                    alt={s.name}
+                    className="size-16 rounded-full object-cover border-2 border-slate-800 shadow-sm"
+                  />
+                ) : (
+                  <div className="flex size-16 items-center justify-center rounded-full border-2 border-slate-800 text-lg font-black">
+                    {initials(s.name)}
+                  </div>
+                )}
                 <p className="text-[12px] font-bold uppercase">{s.name}</p>
                 <p className="text-[9px]">S/D of {s.father}</p>
                 <div className="mt-1 w-full space-y-0.5 text-[8px]">

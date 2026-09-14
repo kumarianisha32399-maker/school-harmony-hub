@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/services/api";
 import { DataTable } from "@/components/common/DataTable";
 import { EmptyState, PageHeader, Panel, SelectField, TextField } from "@/components/common/Ui";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export function MarkAttendance() {
   const [sec, setSec] = useState(sections[0]);
   const [date, setDate] = useState(today());
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const list = useMemo(
     () => students.filter((s: any) => s.className === cls && s.section === sec),
@@ -28,18 +30,34 @@ export function MarkAttendance() {
   const statusOf = (sid: string) =>
     draft[sid] ?? attendance.find((a: any) => a.studentId === sid && a.date === date)?.status ?? "Present";
 
-  const save = () => {
+  const save = async () => {
     if (!list.length) return toast.error("No students in this class and section.");
-    const rest = attendance.filter((a: any) => !(a.date === date && list.some((s: any) => s.id === a.studentId)));
-    const rows = list.map((s: any) => ({
-      id: `att-${s.id}-${date}`,
-      studentId: s.id,
-      date,
-      status: statusOf(s.id),
-    }));
-    replace("attendance", [...rest, ...rows]);
-    setDraft({});
-    toast.success(`Attendance saved for ${list.length} students.`);
+    setSaving(true);
+    try {
+      const rest = attendance.filter((a: any) => !(a.date === date && list.some((s: any) => s.id === a.studentId)));
+      const rows = list.map((s: any) => ({
+        id: `att-${s.id}-${date}`,
+        studentId: s.id,
+        studentName: s.name,
+        className: s.className,
+        section: s.section,
+        date,
+        status: statusOf(s.id),
+      }));
+
+      const res = await api.attendance.mark(rows);
+      if (res?.success) {
+        replace("attendance", [...rest, ...rows]);
+        setDraft({});
+        toast.success(`Attendance saved for ${list.length} students.`);
+      } else {
+        toast.error(res?.error || "Failed to save attendance.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save attendance.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const counts = STATUSES.map((st) => ({ st, n: list.filter((s: any) => statusOf(s.id) === st).length }));
@@ -49,7 +67,11 @@ export function MarkAttendance() {
       <PageHeader
         title="Mark Attendance"
         subtitle={`${cls}-${sec} • ${fmtDate(date)}`}
-        actions={<Button onClick={save}><Save className="size-4" /> Save Attendance</Button>}
+        actions={
+          <Button onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save Attendance
+          </Button>
+        }
       />
       <Panel title="Select class">
         <div className="grid gap-4 sm:grid-cols-3">

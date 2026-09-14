@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/common/DataTable";
 import { PageHeader, Panel, SelectField, TextField, FormModal, useConfirm } from "@/components/common/Ui";
@@ -344,12 +345,36 @@ export function TeacherAttendance() {
     return { present, absent: people.length - present };
   }, [people, status]);
 
+  const [saving, setSaving] = useState(false);
+
+  const saveTeacherAttendance = async () => {
+    setSaving(true);
+    try {
+      const records = people.map((p: any) => ({
+        teacherId: p.id,
+        teacherName: p.name,
+        date,
+        status: status[p.id] || "Present",
+      }));
+      await api.attendance.markTeacher(records);
+      toast.success(`Attendance saved for ${fmtDate(date)}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save attendance");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="Teacher & Staff Attendance"
         subtitle="Mark daily attendance for employees."
-        actions={<Button onClick={() => toast.success(`Attendance saved for ${fmtDate(date)}`)}>Save Attendance</Button>}
+        actions={
+          <Button onClick={saveTeacherAttendance} disabled={saving}>
+            Save Attendance
+          </Button>
+        }
       />
       <Panel>
         <div className="grid gap-4 sm:grid-cols-3">

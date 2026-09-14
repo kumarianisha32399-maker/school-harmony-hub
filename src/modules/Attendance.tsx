@@ -98,7 +98,7 @@ export function MarkAttendance() {
 
 export function DailyAttendance() {
   const { students, attendance, classes } = useApp();
-  const [date, setDate] = useState("2025-08-12");
+  const [date, setDate] = useState(today());
   const [cls, setCls] = useState("All");
 
   const rows = useMemo(() => {
@@ -152,7 +152,7 @@ export function DailyAttendance() {
 export function MonthlyAttendance() {
   const { students, attendance, classes } = useApp();
   const [cls, setCls] = useState("All");
-  const [month, setMonth] = useState("2025-08");
+  const [month, setMonth] = useState(today().slice(0, 7));
 
   const rows = useMemo(
     () =>

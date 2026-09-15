@@ -33,6 +33,7 @@ type Collections = {
   subjects: AnyRow[];
   users: AnyRow[];
   salaries: AnyRow[];
+  udiseStudents: AnyRow[];
 };
 
 type User = { id: string; name: string; username: string; role: string; email: string };
@@ -50,6 +51,9 @@ type Ctx = Collections & {
   update: (key: keyof Collections, id: string, patch: AnyRow) => Promise<void>;
   remove: (key: keyof Collections, id: string) => Promise<void>;
   replace: (key: keyof Collections, rows: AnyRow[]) => void;
+  importStudents: (rows: AnyRow[]) => Promise<{ success: boolean; count: number; error?: string }>;
+  importUdiseStudents: (rows: AnyRow[]) => Promise<{ success: boolean; count: number; error?: string }>;
+  transferUdiseToStudents: (ids?: string[]) => Promise<{ success: boolean; count: number; error?: string }>;
   refreshData: () => Promise<void>;
 };
 
@@ -73,9 +77,11 @@ const EMPTY: Collections = {
   subjects: SUBJECTS,
   users: [],
   salaries: [],
+  udiseStudents: [],
 };
 
 function normalizeRows(rows: any[]): any[] {
+
   if (!Array.isArray(rows)) return [];
   return rows.map((r) => {
     if (!r) return r;
@@ -111,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         settingsRes,
         usersRes,
         payrollRes,
+        udiseRes,
       ] = await Promise.all([
         api.students.getAll().catch(() => ({ success: false, data: [] })),
         api.teachers.getAll().catch(() => ({ success: false, data: [] })),
@@ -128,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         api.settings.get().catch(() => ({ success: false, data: null })),
         api.users.getAll().catch(() => ({ success: false, data: [] })),
         api.payroll.getAll().catch(() => ({ success: false, data: [] })),
+        api.udise.getAll().catch(() => ({ success: false, data: [] })),
       ]);
 
       const classList =
@@ -158,7 +166,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         subjects: subjectList,
         users: normalizeRows(usersRes.data || []),
         salaries: normalizeRows(payrollRes.data || []),
+        udiseStudents: normalizeRows(udiseRes.data || []),
       });
+
 
       if (settingsRes.success && settingsRes.data) {
         setSettings(settingsRes.data);
@@ -356,6 +366,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           case "salaries":
             await api.payroll.save(patch);
             break;
+          case "udiseStudents":
+            await api.udise.update(id, patch);
+            break;
           default:
             break;
         }
@@ -400,6 +413,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           case "users":
             await api.users.delete(id);
             break;
+          case "udiseStudents":
+            await api.udise.delete(id);
+            break;
           default:
             break;
         }
@@ -413,6 +429,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const replace: Ctx["replace"] = useCallback((key, rows) => {
     setData((d) => ({ ...d, [key]: rows }) as Collections);
   }, []);
+
+  const importStudents = useCallback(
+    async (rows: AnyRow[]) => {
+      try {
+        const res = await api.students.importBulk(rows);
+        if (res.success) {
+          await loadAll();
+          return { success: true, count: res.count || res.insertedCount || rows.length };
+        } else {
+          return { success: false, count: 0, error: res.error || "Failed to import students" };
+        }
+      } catch (err: any) {
+        return { success: false, count: 0, error: err.message || "Failed to import students" };
+      }
+    },
+    [loadAll]
+  );
+
+  const importUdiseStudents = useCallback(
+    async (rows: AnyRow[]) => {
+      try {
+        const res = await api.udise.importBulk(rows);
+        if (res.success) {
+          await loadAll();
+          return { success: true, count: res.count || res.insertedCount || rows.length };
+        } else {
+          return { success: false, count: 0, error: res.error || "Failed to import UDISE students" };
+        }
+      } catch (err: any) {
+        return { success: false, count: 0, error: err.message || "Failed to import UDISE students" };
+      }
+    },
+    [loadAll]
+  );
+
+  const transferUdiseToStudents = useCallback(
+    async (ids?: string[]) => {
+      try {
+        const res = await api.udise.transferToStudents(ids);
+        if (res.success) {
+          await loadAll();
+          return { success: true, count: res.count || 0 };
+        } else {
+          return { success: false, count: 0, error: (res as any).error || "Failed to transfer students" };
+        }
+      } catch (err: any) {
+        return { success: false, count: 0, error: err.message || "Failed to transfer students" };
+      }
+    },
+    [loadAll]
+  );
 
   const value = useMemo<Ctx>(
     () => ({
@@ -429,10 +496,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       update,
       remove,
       replace,
+      importStudents,
+      importUdiseStudents,
+      transferUdiseToStudents,
       refreshData: loadAll,
     }),
-    [data, settings, user, ready, theme, toggleTheme, login, logout, saveSettings, add, update, remove, replace, loadAll]
+    [
+      data,
+      settings,
+      user,
+      ready,
+      theme,
+      toggleTheme,
+      login,
+      logout,
+      saveSettings,
+      add,
+      update,
+      remove,
+      replace,
+      importStudents,
+      importUdiseStudents,
+      transferUdiseToStudents,
+      loadAll,
+    ]
   );
+
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

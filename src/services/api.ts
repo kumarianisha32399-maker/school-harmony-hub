@@ -71,7 +71,46 @@ class ApiClient {
       this.request(`/api/students/${id}`, {
         method: "DELETE",
       }),
+    importBulk: (students: any[]) =>
+      this.request<{ count: number; insertedCount: number; updatedCount: number; errors: any[] }>(
+        "/api/students/bulk",
+        {
+          method: "POST",
+          body: JSON.stringify({ students }),
+        }
+      ),
   };
+
+  // UDISE
+  udise = {
+    getAll: () => this.request<any[]>("/api/udise/students"),
+    importBulk: (students: any[]) =>
+      this.request<{ count: number; insertedCount: number; updatedCount: number; errors: any[] }>(
+        "/api/udise/students",
+        {
+          method: "POST",
+          body: JSON.stringify({ students }),
+        }
+      ),
+    transferToStudents: (ids?: string[]) =>
+      this.request<{ count: number; data: any[]; message: string }>(
+        "/api/udise/students/transfer",
+        {
+          method: "POST",
+          body: JSON.stringify({ ids: ids || [] }),
+        }
+      ),
+    update: (id: string, data: any) =>
+      this.request<any>(`/api/udise/students/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      this.request(`/api/udise/students/${id}`, {
+        method: "DELETE",
+      }),
+  };
+
 
   // Admissions
   admissions = {

@@ -26,6 +26,17 @@ export interface IStudent extends Document {
   occupation: string;
   previousSchool: string;
   status: "Active" | "Transferred" | "Left" | "Graduated";
+  penNo?: string;
+  studentStateCode?: string;
+  socialCategory?: string;
+  minorityGroup?: string;
+  bplBeneficiary?: string;
+  cwsn?: string;
+  isRepeater?: string;
+  entryStatus?: string;
+  aadhaarNo?: string;
+  nameAsPerAadhaar?: string;
+  aadhaarValidationStatus?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +72,17 @@ const StudentSchema = new Schema<IStudent>(
       enum: ["Active", "Transferred", "Left", "Graduated"],
       default: "Active",
     },
+    penNo: { type: String, default: "", trim: true },
+    studentStateCode: { type: String, default: "", trim: true },
+    socialCategory: { type: String, default: "General", trim: true },
+    minorityGroup: { type: String, default: "None", trim: true },
+    bplBeneficiary: { type: String, default: "No", trim: true },
+    cwsn: { type: String, default: "No", trim: true },
+    isRepeater: { type: String, default: "No", trim: true },
+    entryStatus: { type: String, default: "Regular", trim: true },
+    aadhaarNo: { type: String, default: "", trim: true },
+    nameAsPerAadhaar: { type: String, default: "", trim: true },
+    aadhaarValidationStatus: { type: String, default: "Pending", trim: true },
   },
   { timestamps: true }
 );

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Dashboard } from "@/modules/Dashboard";
+import { UdiseHub, UdiseImport, UdiseStudentList } from "@/modules/Udise";
 import {
   AddStudent,
   IdCard,
@@ -10,6 +11,7 @@ import {
   StudentProfile,
   TransferStudent,
 } from "@/modules/Students";
+
 import {
   AdmissionList,
   AdmissionReceipt,
@@ -92,9 +94,19 @@ export function resolveModule(slug: string, role = "Admin"): ReactNode | null {
     case "dashboard":
       return <Dashboard />;
 
+    // UDISE
+    case "udise":
+      return <UdiseHub />;
+    case "udise/import":
+      return <UdiseImport />;
+    case "udise/students":
+    case "udise/student-list":
+      return <UdiseStudentList />;
+
     // Students
     case "students":
       return <StudentList />;
+
     case "students/add":
       return <AddStudent />;
     case "students/promote":

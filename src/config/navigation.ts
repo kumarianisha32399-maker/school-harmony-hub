@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, UserPlus, CalendarCheck, Wallet, GraduationCap,
-  FileBadge, Briefcase, School, BarChart3, Megaphone, Settings,
+  FileBadge, Briefcase, School, BarChart3, Megaphone, Settings, FileSpreadsheet,
 } from "lucide-react";
 
 export type NavItem = { label: string; slug: string };
@@ -16,6 +16,13 @@ const ALL = ["Admin", "Teacher", "Accountant", "Staff"];
 
 export const NAV: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, slug: "dashboard", roles: ALL },
+  {
+    label: "UDISE", icon: FileSpreadsheet, roles: ["Admin", "Staff"],
+    items: [
+      { label: "Import Data", slug: "udise/import" },
+      { label: "Import Student List", slug: "udise/students" },
+    ],
+  },
   {
     label: "Students", icon: Users, roles: ["Admin", "Teacher", "Staff"],
     items: [
@@ -134,6 +141,12 @@ export function navForRole(role: string) {
 export function canAccess(role: string, slug: string) {
   const groups = navForRole(role);
   return groups.some(
-    (g) => g.slug === slug || (g.items || []).some((i) => i.slug === slug) || slug.startsWith("students/profile"),
+    (g) =>
+      g.slug === slug ||
+      (g.items || []).some((i) => i.slug === slug || slug.startsWith(i.slug + "/")) ||
+      slug === "udise" ||
+      slug.startsWith("udise/") ||
+      slug.startsWith("students/profile"),
   );
 }
+

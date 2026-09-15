@@ -17,3 +17,4 @@ export * from "./SalaryRecord";
 export * from "./SchoolSettings";
 export * from "./AcademicClass";
 export * from "./Subject";
+export * from "./UdiseStudent";
